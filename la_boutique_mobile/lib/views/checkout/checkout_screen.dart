@@ -7,6 +7,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/order_provider.dart';
+import '../auth/login_screen.dart';
+import '../auth/register_screen.dart';
 import 'order_success_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -20,35 +22,98 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _addressController = TextEditingController();
   final _noteController = TextEditingController();
 
-  String _paymentMethod = 'COD'; // 'COD' or 'BANKING'
+  String _paymentMethod = 'COD'; // 'COD' or 'BANKING' (mapped to BANK_TRANSFER for BE)
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = context.read<AuthProvider>().currentUser;
-      if (user != null) {
-        _nameController.text = user.name;
-        _phoneController.text = user.phone;
-        _addressController.text = user.address;
-      }
+      _autofillUserData();
     });
+  }
+
+  void _autofillUserData() {
+    final user = context.read<AuthProvider>().currentUser;
+    if (user != null) {
+      if (_nameController.text.isEmpty) _nameController.text = user.name;
+      if (_phoneController.text.isEmpty) _phoneController.text = user.phone;
+      if (_emailController.text.isEmpty) _emailController.text = user.email;
+      if (_addressController.text.isEmpty) _addressController.text = user.address;
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _addressController.dispose();
     _noteController.dispose();
     super.dispose();
   }
 
+  void _showRequireLoginDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.sand50,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.lock_outline, color: AppColors.clay500),
+            SizedBox(width: 8),
+            Text('Yêu Cầu Đăng Nhập', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'Để bảo vệ quyền lợi và theo dõi tiến trình đơn hàng, bạn vui lòng đăng nhập tài khoản trước khi đặt hàng.',
+          style: TextStyle(fontSize: 13, color: AppColors.mute, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ĐỂ SAU', style: TextStyle(color: AppColors.mute)),
+          ),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.clay500),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()))
+                  .then((_) => _autofillUserData());
+            },
+            child: const Text('ĐĂNG KÝ', style: TextStyle(color: AppColors.clay600, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.clay500,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()))
+                  .then((_) => _autofillUserData());
+            },
+            child: const Text('ĐĂNG NHẬP', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _submitOrder() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) {
+      _showRequireLoginDialog();
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     final cart = context.read<CartProvider>();
@@ -56,48 +121,60 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     setState(() => _isSubmitting = true);
 
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
+    try {
+      final orderId = await context.read<OrderProvider>().createOrder(
+            customerName: _nameController.text.trim(),
+            phone: _phoneController.text.trim(),
+            email: _emailController.text.trim(),
+            address: _addressController.text.trim(),
+            note: _noteController.text.trim().isNotEmpty ? _noteController.text.trim() : null,
+            items: cart.cartItemsList,
+            subtotal: cart.subtotal,
+            discount: cart.discountAmount,
+            shippingFee: cart.shippingFee,
+            total: cart.totalAmount,
+            paymentMethod: _paymentMethod,
+          );
 
-    final orderId = context.read<OrderProvider>().createOrder(
-          customerName: _nameController.text.trim(),
-          phone: _phoneController.text.trim(),
-          address: _addressController.text.trim(),
-          note: _noteController.text.trim().isNotEmpty ? _noteController.text.trim() : null,
-          items: cart.cartItemsList,
-          subtotal: cart.subtotal,
-          discount: cart.discountAmount,
-          shippingFee: cart.shippingFee,
-          total: cart.totalAmount,
-          paymentMethod: _paymentMethod,
-        );
+      if (!mounted) return;
 
-    // Add in-app notification
-    context.read<NotificationProvider>().addOrderNotification(orderId);
+      // Add in-app notification
+      context.read<NotificationProvider>().addOrderNotification(orderId);
 
-    final total = cart.totalAmount;
-    final name = _nameController.text.trim();
+      final total = cart.totalAmount;
+      final name = _nameController.text.trim();
 
-    cart.clearCart();
+      cart.clearCart();
 
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => OrderSuccessScreen(
-          orderId: orderId,
-          totalAmount: total,
-          customerName: name,
-          paymentMethod: _paymentMethod,
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => OrderSuccessScreen(
+            orderId: orderId,
+            totalAmount: total,
+            customerName: name,
+            paymentMethod: _paymentMethod,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi đặt hàng: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
+    final auth = context.watch<AuthProvider>();
 
     return Scaffold(
       backgroundColor: AppColors.sand50,
@@ -111,6 +188,70 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Guest Warning Banner if not logged in
+              if (!auth.isAuthenticated) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.amber.shade900, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Bạn chưa đăng nhập tài khoản',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Để đồng bộ đơn hàng với hệ thống máy chủ, bạn nên đăng nhập trước khi xác nhận đơn.',
+                        style: TextStyle(fontSize: 12, color: AppColors.mute, height: 1.3),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.clay500,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()))
+                                  .then((_) => _autofillUserData());
+                            },
+                            child: const Text('ĐĂNG NHẬP'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.clay500),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()))
+                                  .then((_) => _autofillUserData());
+                            },
+                            child: const Text('ĐĂNG KÝ', style: TextStyle(color: AppColors.clay600)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // Delivery Info Section
               Container(
                 padding: const EdgeInsets.all(16),
@@ -166,6 +307,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Địa chỉ Email (để nhận hóa đơn điện tử)',
+                        prefixIcon: Icon(Icons.email_outlined, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
                       controller: _addressController,
                       maxLines: 2,
                       decoration: const InputDecoration(
@@ -215,27 +365,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // COD Option
-                    RadioListTile<String>(
-                      value: 'COD',
+                    RadioGroup<String>(
                       groupValue: _paymentMethod,
-                      onChanged: (val) => setState(() => _paymentMethod = val!),
-                      activeColor: AppColors.clay500,
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Thanh toán khi nhận hàng (COD)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Nàng kiểm tra hàng và thanh toán tiền mặt cho shipper', style: TextStyle(fontSize: 12, color: AppColors.mute)),
-                    ),
-                    const Divider(height: 12, color: AppColors.sand200),
-
-                    // VietQR Option
-                    RadioListTile<String>(
-                      value: 'BANKING',
-                      groupValue: _paymentMethod,
-                      onChanged: (val) => setState(() => _paymentMethod = val!),
-                      activeColor: AppColors.clay500,
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Chuyển khoản VietQR 24/7', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      subtitle: const Text('Quét mã QR tự động điền số tiền và nội dung chuyển khoản', style: TextStyle(fontSize: 12, color: AppColors.mute)),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _paymentMethod = val);
+                        }
+                      },
+                      child: Column(
+                        children: [
+                          RadioListTile<String>(
+                            value: 'COD',
+                            activeColor: AppColors.clay500,
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Thanh toán khi nhận hàng (COD)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            subtitle: const Text('Nàng kiểm tra hàng và thanh toán tiền mặt cho shipper', style: TextStyle(fontSize: 12, color: AppColors.mute)),
+                          ),
+                          const Divider(height: 12, color: AppColors.sand200),
+                          RadioListTile<String>(
+                            value: 'BANKING',
+                            activeColor: AppColors.clay500,
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Chuyển khoản VietQR 24/7', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            subtitle: const Text('Quét mã QR tự động điền số tiền và nội dung chuyển khoản', style: TextStyle(fontSize: 12, color: AppColors.mute)),
+                          ),
+                        ],
+                      ),
                     ),
 
                     // Dynamic VietQR Box
@@ -255,7 +410,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.clay700),
                             ),
                             const SizedBox(height: 10),
-                            // Simulated VietQR Image
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
@@ -269,7 +423,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=LA_BOUTIQUE_VN_ORDER_${cart.totalAmount.toInt()}',
                                     width: 140,
                                     height: 140,
-                                    errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_2, size: 100, color: AppColors.ink),
+                                    errorBuilder: (_, _, _) => const Icon(Icons.qr_code_2, size: 100, color: AppColors.ink),
                                   ),
                                   const SizedBox(height: 6),
                                   const Text('Ngân hàng: MBBank', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),

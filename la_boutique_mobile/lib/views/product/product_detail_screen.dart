@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
@@ -19,11 +20,17 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _selectedImageIndex = 0;
-  String _selectedSize = 'M';
+  late String _selectedSize;
   int _quantity = 1;
   final PageController _pageController = PageController();
 
-  final List<String> _sizes = ['S', 'M', 'L'];
+  @override
+  void initState() {
+    super.initState();
+    final sizes = widget.product.availableSizes;
+    final inStock = sizes.where((s) => widget.product.isSizeInStock(s)).toList();
+    _selectedSize = inStock.isNotEmpty ? inStock.first : (sizes.isNotEmpty ? sizes.first : 'M');
+  }
 
   void _showSizeGuide() {
     showDialog(
@@ -113,22 +120,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildImageItem(String path) {
     final isNetwork = path.startsWith('http://') || path.startsWith('https://');
+    final placeholder = Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.sand100, AppColors.sand200],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.dry_cleaning_outlined, color: AppColors.clay400.withValues(alpha: 0.6), size: 40),
+            const SizedBox(height: 6),
+            Text(
+              'LA BOUTIQUE VN',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 2,
+                fontWeight: FontWeight.bold,
+                color: AppColors.mute.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
     return isNetwork
         ? Image.network(
             path,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: AppColors.sand200,
-              child: const Icon(Icons.image_not_supported_outlined, size: 40, color: AppColors.mute),
-            ),
+            errorBuilder: (_, _, _) => placeholder,
           )
         : Image.asset(
             path,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: AppColors.sand200,
-              child: const Icon(Icons.image_not_supported_outlined, size: 40, color: AppColors.mute),
-            ),
+            errorBuilder: (_, _, _) => placeholder,
           );
   }
 
@@ -150,7 +179,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               isFav ? Icons.favorite : Icons.favorite_border,
               color: isFav ? Colors.red : AppColors.ink,
             ),
-            onPressed: () => productProvider.toggleFavorite(p.id),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              productProvider.toggleFavorite(p.id);
+            },
           ),
           Stack(
             children: [
@@ -221,13 +253,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           gallery.length,
                           (i) => AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: _selectedImageIndex == i ? 20 : 7,
-                            height: 7,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: _selectedImageIndex == i ? 18 : 6,
+                            height: 6,
                             decoration: BoxDecoration(
                               color: _selectedImageIndex == i
                                   ? AppColors.clay500
-                                  : AppColors.white.withOpacity(0.7),
+                                  : AppColors.white.withValues(alpha: 0.7),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -246,7 +278,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: gallery.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     final isSelected = _selectedImageIndex == index;
                     return GestureDetector(
@@ -283,23 +315,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Collection tag
-                  if (p.collection == 'sunset')
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.clay100,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        '🌅 BỘ SƯU TẬP SUNSET SS26',
-                        style: TextStyle(
-                          color: AppColors.clay700,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                  // Collection tag & SKU
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    children: [
+                      if (p.collection.toUpperCase() == 'SUNSET')
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.clay100,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            '🌅 BỘ SƯU TẬP SUNSET SS26',
+                            style: TextStyle(
+                              color: AppColors.clay700,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      if (p.sku.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.sand200,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'SKU: ${p.sku}',
+                            style: const TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
 
                   // Title
@@ -363,14 +417,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'KÍCH THƯỚC (SIZE)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.8,
-                          color: AppColors.ink,
-                        ),
+                      Row(
+                        children: [
+                          const Text(
+                            'KÍCH THƯỚC (SIZE)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (p.isSizeInStock(_selectedSize))
+                            Text(
+                              '(${p.getStockForSize(_selectedSize)} sản phẩm)',
+                              style: const TextStyle(fontSize: 11, color: AppColors.mute),
+                            )
+                          else
+                            const Text(
+                              '(Tạm hết hàng)',
+                              style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold),
+                            ),
+                        ],
                       ),
                       TextButton.icon(
                         onPressed: _showSizeGuide,
@@ -387,28 +456,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: _sizes.map((size) {
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: p.availableSizes.map((size) {
                       final isSelected = _selectedSize == size;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: ChoiceChip(
-                          label: Text(size),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            if (selected) setState(() => _selectedSize = size);
-                          },
-                          selectedColor: AppColors.clay500,
-                          backgroundColor: AppColors.white,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : AppColors.ink,
+                      final inStock = p.isSizeInStock(size);
+                      final stock = p.getStockForSize(size);
+
+                      return ChoiceChip(
+                        label: Text(
+                          inStock ? size : '$size (Hết)',
+                          style: TextStyle(
+                            color: !inStock
+                                ? AppColors.mute
+                                : (isSelected ? Colors.white : AppColors.ink),
                             fontWeight: FontWeight.bold,
+                            decoration: inStock ? null : TextDecoration.lineThrough,
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(
-                              color: isSelected ? AppColors.clay500 : AppColors.sand300,
-                            ),
+                        ),
+                        selected: isSelected,
+                        onSelected: inStock
+                            ? (selected) {
+                                if (selected) {
+                                  HapticFeedback.selectionClick();
+                                  setState(() {
+                                    _selectedSize = size;
+                                    if (_quantity > stock) _quantity = stock > 0 ? stock : 1;
+                                  });
+                                }
+                              }
+                            : null,
+                        selectedColor: AppColors.clay500,
+                        backgroundColor: inStock ? AppColors.white : AppColors.sand200.withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: isSelected ? AppColors.clay500 : AppColors.sand300,
                           ),
                         ),
                       );
@@ -439,7 +523,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           children: [
                             IconButton(
                               icon: const Icon(Icons.remove, size: 16),
-                              onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
+                              onPressed: _quantity > 1
+                                  ? () {
+                                      HapticFeedback.lightImpact();
+                                      setState(() => _quantity--);
+                                    }
+                                  : null,
                             ),
                             Text(
                               '$_quantity',
@@ -447,7 +536,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                             IconButton(
                               icon: const Icon(Icons.add, size: 16),
-                              onPressed: () => setState(() => _quantity++),
+                              onPressed: p.isSizeInStock(_selectedSize) && _quantity < p.getStockForSize(_selectedSize)
+                                  ? () {
+                                      HapticFeedback.lightImpact();
+                                      setState(() => _quantity++);
+                                    }
+                                  : null,
                             ),
                           ],
                         ),
@@ -605,86 +699,120 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: AppColors.white,
+          border: Border(
+            top: BorderSide(color: AppColors.sand200.withValues(alpha: 0.8), width: 0.8),
+          ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.ink.withOpacity(0.08),
-              blurRadius: 10,
+              color: AppColors.ink.withValues(alpha: 0.06),
+              blurRadius: 12,
               offset: const Offset(0, -3),
             ),
           ],
         ),
         child: SafeArea(
-          child: Row(
-            children: [
-              // Add to Cart
-              Expanded(
-                flex: 1,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.clay500, width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    context.read<CartProvider>().addToCart(
-                          p,
-                          size: _selectedSize,
-                          quantity: _quantity,
-                        );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Đã thêm $_quantity x "${p.name}" (Size $_selectedSize) vào giỏ'),
-                        duration: const Duration(seconds: 2),
-                        backgroundColor: AppColors.ink,
-                        behavior: SnackBarBehavior.floating,
-                        action: SnackBarAction(
-                          label: 'XEM GIỎ',
-                          textColor: AppColors.clay300,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const CartScreen()),
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_shopping_cart, size: 18, color: AppColors.clay500),
-                      SizedBox(width: 6),
-                      Text('Thêm vào giỏ', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
+          child: Builder(
+            builder: (context) {
+              final bool currentInStock = p.isSizeInStock(_selectedSize);
 
-              // Buy Now
-              Expanded(
-                flex: 1,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              return Row(
+                children: [
+                  // Add to Cart
+                  Expanded(
+                    flex: 1,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        side: BorderSide(
+                          color: currentInStock ? AppColors.clay500 : AppColors.sand300,
+                          width: 1.2,
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: currentInStock
+                          ? () {
+                              context.read<CartProvider>().addToCart(
+                                    p,
+                                    size: _selectedSize,
+                                    quantity: _quantity,
+                                  );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Đã thêm $_quantity x "${p.name}" (Size $_selectedSize) vào giỏ'),
+                                  duration: const Duration(seconds: 2),
+                                  backgroundColor: AppColors.ink,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  action: SnackBarAction(
+                                    label: 'XEM GIỎ',
+                                    textColor: AppColors.sand300,
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const CartScreen()),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            }
+                          : null,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_shopping_cart_rounded,
+                            size: 16,
+                            color: currentInStock ? AppColors.clay500 : AppColors.mute,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            currentInStock ? 'Thêm vào giỏ' : 'Hết hàng',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: currentInStock ? AppColors.clay600 : AppColors.mute,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  onPressed: () {
-                    context.read<CartProvider>().addToCart(
-                          p,
-                          size: _selectedSize,
-                          quantity: _quantity,
-                        );
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartScreen()),
-                    );
-                  },
-                  child: const Text('MUA NGAY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                ),
-              ),
-            ],
+                  const SizedBox(width: 12),
+
+                  // Buy Now
+                  Expanded(
+                    flex: 1,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: currentInStock ? AppColors.clay500 : AppColors.sand300,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: currentInStock ? 2 : 0,
+                      ),
+                      onPressed: currentInStock
+                          ? () {
+                              context.read<CartProvider>().addToCart(
+                                    p,
+                                    size: _selectedSize,
+                                    quantity: _quantity,
+                                  );
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const CartScreen()),
+                              );
+                            }
+                          : null,
+                      child: Text(
+                        currentInStock ? 'MUA NGAY' : 'TẠM HẾT HÀNG',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

@@ -70,20 +70,21 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: notifications.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = notifications[index];
                       return InkWell(
                         onTap: () => notifProvider.markAsRead(item.id),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: item.isRead ? AppColors.white : AppColors.clay50,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: item.isRead ? AppColors.sand200 : AppColors.clay200,
+                              color: item.isRead ? AppColors.sand200.withValues(alpha: 0.8) : AppColors.clay200,
                             ),
+                            boxShadow: item.isRead ? AppColors.cardShadow : null,
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,7 +144,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                     const SizedBox(height: 8),
                                     Text(
                                       Formatters.formatDate(item.timestamp),
-                                      style: TextStyle(fontSize: 10, color: AppColors.mute.withOpacity(0.8)),
+                                      style: TextStyle(fontSize: 10, color: AppColors.mute.withValues(alpha: 0.8)),
                                     ),
                                   ],
                                 ),

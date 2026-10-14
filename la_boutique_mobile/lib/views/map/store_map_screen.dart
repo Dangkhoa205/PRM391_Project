@@ -58,7 +58,7 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
+                                color: Colors.black.withValues(alpha: 0.3),
                                 blurRadius: 6,
                                 offset: const Offset(0, 3),
                               ),
@@ -106,10 +106,10 @@ class _StoreMapScreenState extends State<StoreMapScreen> {
               decoration: BoxDecoration(
                 color: AppColors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.sand200),
+                border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8)),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.ink.withOpacity(0.12),
+                    color: AppColors.ink.withValues(alpha: 0.12),
                     blurRadius: 15,
                     offset: const Offset(0, 5),
                   ),

@@ -46,79 +46,83 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: tabs,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.white,
-        selectedItemColor: AppColors.clay500,
-        unselectedItemColor: AppColors.mute,
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Trang chủ',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          border: Border(
+            top: BorderSide(color: AppColors.sand200.withValues(alpha: 0.8), width: 0.8),
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view_outlined),
-            activeIcon: Icon(Icons.grid_view),
-            label: 'Sản phẩm',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.map_outlined),
-            activeIcon: Icon(Icons.map),
-            label: 'Cửa hàng',
-          ),
-          BottomNavigationBarItem(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.notifications_outlined),
-                if (notif.unreadCount > 0)
-                  Positioned(
-                    right: -4,
-                    top: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: AppColors.clay500,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                      child: Text(
-                        '${notif.unreadCount}',
-                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.ink.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedItemColor: AppColors.clay500,
+          unselectedItemColor: AppColors.mute.withValues(alpha: 0.7),
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home_rounded),
+              label: 'Trang chủ',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.grid_view_outlined),
+              activeIcon: Icon(Icons.grid_view_rounded),
+              label: 'Sản phẩm',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.map_outlined),
+              activeIcon: Icon(Icons.map_rounded),
+              label: 'Cửa hàng',
+            ),
+            BottomNavigationBarItem(
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.notifications_outlined),
+                  if (notif.unreadCount > 0)
+                    Positioned(
+                      right: -4,
+                      top: -2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.clay500,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                        child: Text(
+                          '${notif.unreadCount}',
+                          style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
+              activeIcon: const Icon(Icons.notifications_rounded),
+              label: 'Thông báo',
             ),
-            activeIcon: const Icon(Icons.notifications),
-            label: 'Thông báo',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Tài khoản',
-          ),
-        ],
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: 'Tài khoản',
+            ),
+          ],
+        ),
       ),
-      floatingActionButton: _currentIndex == 0
-          ? FloatingActionButton(
-              backgroundColor: AppColors.clay500,
-              foregroundColor: Colors.white,
-              elevation: 4,
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ChatScreen()),
-                );
-              },
-              child: const Icon(Icons.chat_bubble_outline),
-            )
-          : null,
     );
   }
 }
@@ -245,9 +249,9 @@ class _HomeTabState extends State<_HomeTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Hero Auto Carousel (Matches Hero.tsx)
+            // 1. Hero Auto Carousel (Editorial Luxury Style)
             SizedBox(
-              height: 400,
+              height: 340,
               child: Stack(
                 children: [
                   PageView.builder(
@@ -265,16 +269,8 @@ class _HomeTabState extends State<_HomeTab> {
                   // Dark Vignette Gradient
                   Positioned.fill(
                     child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            AppColors.ink.withValues(alpha: 0.95),
-                            AppColors.ink.withValues(alpha: 0.35),
-                            Colors.transparent,
-                          ],
-                        ),
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.darkVignette,
                       ),
                     ),
                   ),
@@ -282,75 +278,76 @@ class _HomeTabState extends State<_HomeTab> {
                   Positioned(
                     left: 20,
                     right: 20,
-                    bottom: 24,
+                    bottom: 20,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Tag Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.4),
+                            color: Colors.black.withValues(alpha: 0.45),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 12),
-                              SizedBox(width: 6),
+                              Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 11),
+                              SizedBox(width: 5),
                               Text(
                                 'BỘ SƯU TẬP HÈ 2026 • SIGNATURE',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 10,
+                                  fontSize: 9.5,
                                   fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.0,
+                                  letterSpacing: 0.8,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
                         Text(
                           'LA BOUTIQUE SUNSET',
                           style: GoogleFonts.playfairDisplay(
-                            fontSize: 26,
+                            fontSize: 23,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1.5,
                             color: Colors.white,
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         const Text(
-                          'Hành trình mùa hè của người nữ du mục — tự do, bản năng và đầy khao khát khám phá những bờ biển mới cùng lụa tơ tằm & linen tự nhiên.',
+                          'Hành trình mùa hè của người nữ du mục — tự do & phóng khoáng cùng lụa tơ tằm & linen tự nhiên.',
                           style: TextStyle(
                             color: Colors.white70,
                             fontSize: 11,
-                            height: 1.4,
+                            height: 1.3,
                           ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
                         // CTA Button
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.clay500,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: 3,
                           ),
                           onPressed: widget.onExplore,
                           icon: const Text(
                             'KHÁM PHÁ BỘ SƯU TẬP',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.8),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, letterSpacing: 0.6),
                           ),
-                          label: const Icon(Icons.arrow_forward, size: 14),
+                          label: const Icon(Icons.arrow_forward_rounded, size: 13),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         // Carousel Dots
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -358,11 +355,11 @@ class _HomeTabState extends State<_HomeTab> {
                             _heroSlides.length,
                             (i) => AnimatedContainer(
                               duration: const Duration(milliseconds: 250),
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              width: _currentHeroSlide == i ? 18 : 6,
-                              height: 5,
+                              margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                              width: _currentHeroSlide == i ? 16 : 5,
+                              height: 4,
                               decoration: BoxDecoration(
-                                color: _currentHeroSlide == i ? AppColors.clay500 : Colors.white54,
+                                color: _currentHeroSlide == i ? AppColors.clay500 : Colors.white60,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
@@ -375,23 +372,58 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
 
-            // 2. ValueStrip 4 Commitments (Matches ValueStrip.tsx)
+            // 2. Streamlined ValueStrip (Clean Modern Card)
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-              color: AppColors.sand100,
+              margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8), width: 0.8),
+                boxShadow: AppColors.cardShadow,
+              ),
               child: Column(
                 children: [
                   Row(
                     children: const [
-                      Expanded(child: _ValueItem(icon: Icons.local_shipping_outlined, title: 'Freeship quét QR', desc: 'Chuyển khoản QR miễn phí ship')),
-                      Expanded(child: _ValueItem(icon: Icons.cached, title: 'Đổi trả 7 ngày', desc: 'Hỗ trợ đổi size tận tâm')),
+                      Expanded(
+                        child: _ValueItem(
+                          icon: Icons.local_shipping_outlined,
+                          title: 'Freeship quét QR',
+                          desc: 'Chuyển khoản QR miễn phí ship',
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: _ValueItem(
+                          icon: Icons.cached_rounded,
+                          title: 'Đổi trả 7 ngày',
+                          desc: 'Hỗ trợ đổi size tận tâm',
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Divider(height: 1, thickness: 0.6, color: AppColors.sand200),
+                  ),
                   Row(
                     children: const [
-                      Expanded(child: _ValueItem(icon: Icons.verified_user_outlined, title: 'Thanh toán linh hoạt', desc: 'QR freeship hoặc COD tận tay')),
-                      Expanded(child: _ValueItem(icon: Icons.support_agent_outlined, title: 'Tư vấn chọn size 24/7', desc: 'Hotline & Zalo: 0901 234 567')),
+                      Expanded(
+                        child: _ValueItem(
+                          icon: Icons.verified_user_outlined,
+                          title: 'Thanh toán linh hoạt',
+                          desc: 'QR freeship hoặc COD tận tay',
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: _ValueItem(
+                          icon: Icons.support_agent_rounded,
+                          title: 'Tư vấn chọn size 24/7',
+                          desc: 'Stylist chuyên nghiệp chu đáo',
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -400,7 +432,7 @@ class _HomeTabState extends State<_HomeTab> {
 
             // 3. Sunset Collection Section
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -410,14 +442,16 @@ class _HomeTabState extends State<_HomeTab> {
                       Text(
                         'BST SUNSET SS26',
                         style: GoogleFonts.playfairDisplay(
-                          fontSize: 18,
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
                           color: AppColors.ink,
+                          letterSpacing: 0.5,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       const Text(
                         '3 Thiết kế biểu tượng phiên bản giới hạn',
-                        style: TextStyle(fontSize: 12, color: AppColors.mute),
+                        style: TextStyle(fontSize: 11.5, color: AppColors.mute),
                       ),
                     ],
                   ),
@@ -430,10 +464,11 @@ class _HomeTabState extends State<_HomeTab> {
                         ),
                       );
                     },
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
                     child: const Row(
                       children: [
                         Text('Xem tất cả', style: TextStyle(color: AppColors.clay600, fontSize: 12, fontWeight: FontWeight.bold)),
-                        Icon(Icons.chevron_right, size: 16, color: AppColors.clay600),
+                        Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.clay600),
                       ],
                     ),
                   ),
@@ -443,24 +478,27 @@ class _HomeTabState extends State<_HomeTab> {
 
             // Horizontal Sunset Items
             SizedBox(
-              height: 290,
+              height: 285,
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 scrollDirection: Axis.horizontal,
                 itemCount: sunsetList.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
                   return SizedBox(
                     width: 175,
-                    child: ProductCard(product: sunsetList[index]),
+                    child: ProductCard(
+                      product: sunsetList[index],
+                      heroPrefix: 'sunset',
+                    ),
                   );
                 },
               ),
             ),
 
-            // 4. Brand Story Section (Matches BrandStory.tsx)
+            // 4. Brand Story Section (Editorial Luxury Banner)
             Container(
-              margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              margin: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
@@ -468,26 +506,34 @@ class _HomeTabState extends State<_HomeTab> {
                 image: const DecorationImage(
                   image: AssetImage('assets/images/products/sunset-main-4.jpg'),
                   fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(Colors.black54, BlendMode.darken),
+                  colorFilter: ColorFilter.mode(Color(0x99000000), BlendMode.darken),
                 ),
+                boxShadow: AppColors.floatingShadow,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text(
-                    'CÂU CHUYỆN THƯƠNG HIỆU',
-                    style: TextStyle(
-                      color: AppColors.clay300,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.clay500.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'CÂU CHUYỆN THƯƠNG HIỆU',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
                     'Tinh Thần La Boutique',
                     style: GoogleFonts.playfairDisplay(
-                      fontSize: 22,
+                      fontSize: 21,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -495,12 +541,12 @@ class _HomeTabState extends State<_HomeTab> {
                   const SizedBox(height: 8),
                   const Text(
                     'LA BOUTIQUE VN sinh ra từ tình yêu với những bờ biển rực rỡ và ánh hoàng hôn ấm áp. Mỗi thiết kế là lời mời gọi nàng cất bước — tự do, bản năng và đầy khao khát khám phá những chân trời mới.',
-                    style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
+                    style: TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.5),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  const Divider(color: Colors.white24),
-                  const SizedBox(height: 8),
+                  const Divider(color: Colors.white24, height: 1),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: const [
@@ -515,7 +561,7 @@ class _HomeTabState extends State<_HomeTab> {
 
             // 5. All Products Section
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -525,14 +571,16 @@ class _HomeTabState extends State<_HomeTab> {
                       Text(
                         'TẤT CẢ THIẾT KẾ',
                         style: GoogleFonts.playfairDisplay(
-                          fontSize: 18,
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
                           color: AppColors.ink,
+                          letterSpacing: 0.5,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       const Text(
                         'Đầy đủ các mẫu áo yếm, đầm lụa và chân váy mùa hè',
-                        style: TextStyle(fontSize: 12, color: AppColors.mute),
+                        style: TextStyle(fontSize: 11.5, color: AppColors.mute),
                       ),
                     ],
                   ),
@@ -547,38 +595,53 @@ class _HomeTabState extends State<_HomeTab> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 0.58,
+                childAspectRatio: 0.57,
                 crossAxisSpacing: 12,
-                mainAxisSpacing: 16,
+                mainAxisSpacing: 14,
               ),
               itemCount: allProducts.length,
               itemBuilder: (context, index) {
-                return ProductCard(product: allProducts[index]);
+                return ProductCard(
+                  product: allProducts[index],
+                  heroPrefix: 'all',
+                );
               },
             ),
 
-            // 6. Customer Reviews Section (Matches ReviewsBoard.tsx)
+            // 6. Customer Reviews Section
             Container(
               padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
               color: AppColors.sand100,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'NÀNG THƠ CHIA SẺ',
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  const Text(
-                    'Những đánh giá chân thực từ khách hàng La Boutique',
-                    style: TextStyle(fontSize: 12, color: AppColors.mute),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'NÀNG THƠ CHIA SẺ',
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Đánh giá chân thực từ khách hàng La Boutique',
+                            style: TextStyle(fontSize: 11.5, color: AppColors.mute),
+                          ),
+                        ],
+                      ),
+                      const Icon(Icons.format_quote_rounded, color: AppColors.clay400, size: 28),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   SizedBox(
-                    height: 130,
+                    height: 135,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: const [
@@ -629,20 +692,30 @@ class _ValueItem extends StatelessWidget {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
             color: AppColors.clay50,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 18, color: AppColors.clay500),
+          child: Icon(icon, size: 16, color: AppColors.clay500),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ink)),
-              Text(desc, style: const TextStyle(fontSize: 10, color: AppColors.mute), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ink),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                desc,
+                style: const TextStyle(fontSize: 9.5, color: AppColors.mute),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -691,12 +764,13 @@ class _ReviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 260,
+      width: 250,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.sand200),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8)),
+        boxShadow: AppColors.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,22 +778,35 @@ class _ReviewCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundColor: AppColors.clay100,
+                    child: Text(
+                      name[0],
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.clay600),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: AppColors.ink)),
+                ],
+              ),
               Row(
                 children: List.generate(
                   rating,
-                  (index) => const Icon(Icons.star, size: 12, color: Colors.amber),
+                  (index) => const Icon(Icons.star_rounded, size: 13, color: Colors.amber),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 2),
-          Text(time, style: const TextStyle(fontSize: 10, color: AppColors.mute)),
+          const SizedBox(height: 4),
+          Text(time, style: const TextStyle(fontSize: 9.5, color: AppColors.mute)),
           const SizedBox(height: 6),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 11, height: 1.3, color: AppColors.ink),
+              style: const TextStyle(fontSize: 11, height: 1.35, color: AppColors.ink),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),

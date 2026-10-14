@@ -30,6 +30,46 @@ class AppColors {
   static const Color border = Color(0xFFECDCC6);
   static const Color cardBg = Colors.white;
   static const Color success = Color(0xFF2E7D32);
+
+  // Modern Gradients
+  static const LinearGradient primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFCD7F55), Color(0xFFBD6638), Color(0xFFA1542E)],
+  );
+
+  static const LinearGradient luxuryGoldGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFE2C9A5), Color(0xFFC9A479)],
+  );
+
+  static const LinearGradient darkVignette = LinearGradient(
+    begin: Alignment.bottomCenter,
+    end: Alignment.topCenter,
+    colors: [
+      Color(0xE62A2019),
+      Color(0x662A2019),
+      Colors.transparent,
+    ],
+  );
+
+  // Modern soft shadows
+  static List<BoxShadow> get cardShadow => [
+        BoxShadow(
+          color: ink.withValues(alpha: 0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
+        ),
+      ];
+
+  static List<BoxShadow> get floatingShadow => [
+        BoxShadow(
+          color: ink.withValues(alpha: 0.08),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ];
 }
 
 class AppTheme {
@@ -55,35 +95,38 @@ class AppTheme {
         iconTheme: const IconThemeData(color: AppColors.ink),
         titleTextStyle: GoogleFonts.playfairDisplay(
           color: AppColors.ink,
-          fontSize: 20,
+          fontSize: 19,
           fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
+          letterSpacing: 1.5,
         ),
       ),
       textTheme: TextTheme(
         displayLarge: GoogleFonts.playfairDisplay(
           color: AppColors.ink,
-          fontSize: 32,
+          fontSize: 30,
           fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
         displayMedium: GoogleFonts.playfairDisplay(
           color: AppColors.ink,
-          fontSize: 26,
+          fontSize: 24,
           fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
         titleLarge: GoogleFonts.playfairDisplay(
           color: AppColors.ink,
-          fontSize: 20,
+          fontSize: 19,
           fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
         ),
         titleMedium: GoogleFonts.montserrat(
           color: AppColors.ink,
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: FontWeight.w600,
         ),
         bodyLarge: GoogleFonts.montserrat(
           color: AppColors.ink,
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: FontWeight.w400,
           height: 1.5,
         ),
@@ -95,7 +138,7 @@ class AppTheme {
         ),
         labelLarge: GoogleFonts.montserrat(
           color: AppColors.white,
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
         ),
@@ -105,12 +148,12 @@ class AppTheme {
           backgroundColor: AppColors.clay500,
           foregroundColor: AppColors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
           textStyle: GoogleFonts.montserrat(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
@@ -120,12 +163,12 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.clay500,
           side: const BorderSide(color: AppColors.clay500, width: 1.2),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
           textStyle: GoogleFonts.montserrat(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -133,29 +176,29 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.sand200),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.sand200),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.clay500, width: 1.5),
         ),
         hintStyle: GoogleFonts.montserrat(
-          color: AppColors.mute.withOpacity(0.6),
-          fontSize: 14,
+          color: AppColors.mute.withValues(alpha: 0.6),
+          fontSize: 13,
         ),
       ),
       cardTheme: CardThemeData(
         color: AppColors.cardBg,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           side: const BorderSide(color: AppColors.sand200, width: 0.8),
         ),
       ),
@@ -165,7 +208,7 @@ class AppTheme {
         unselectedItemColor: AppColors.mute,
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 6,
       ),
     );
   }

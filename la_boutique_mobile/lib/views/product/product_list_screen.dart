@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
 import '../cart/cart_screen.dart';
 import '../widgets/product_card.dart';
+import '../widgets/shimmer_loading.dart';
 
 class ProductListScreen extends StatefulWidget {
   final String? initialCategory;
@@ -34,18 +36,292 @@ class _ProductListScreenState extends State<ProductListScreen> {
     super.dispose();
   }
 
+  void _showFilterSheet(BuildContext context, ProductProvider provider) {
+    HapticFeedback.lightImpact();
+    double? tempMin = provider.minPrice;
+    double? tempMax = provider.maxPrice;
+    String? tempSize = provider.selectedSize;
+    String? tempCollection = provider.selectedCollection;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.sand300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Bộ Lọc Sản Phẩm',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 20, color: AppColors.sand200),
+
+                    // Section: Mức giá
+                    const Text('Khoảng giá', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.ink)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterOptionChip(
+                          label: 'Tất cả giá',
+                          isSelected: tempMin == null && tempMax == null,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() {
+                              tempMin = null;
+                              tempMax = null;
+                            });
+                          },
+                        ),
+                        _buildFilterOptionChip(
+                          label: '< 500.000₫',
+                          isSelected: tempMin == null && tempMax == 500000,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() {
+                              tempMin = null;
+                              tempMax = 500000;
+                            });
+                          },
+                        ),
+                        _buildFilterOptionChip(
+                          label: '500.000₫ - 1.000.000₫',
+                          isSelected: tempMin == 500000 && tempMax == 1000000,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() {
+                              tempMin = 500000;
+                              tempMax = 1000000;
+                            });
+                          },
+                        ),
+                        _buildFilterOptionChip(
+                          label: '> 1.000.000₫',
+                          isSelected: tempMin == 1000000 && tempMax == null,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() {
+                              tempMin = 1000000;
+                              tempMax = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Section: Kích thước (Size)
+                    const Text('Kích thước (Size)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.ink)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterOptionChip(
+                          label: 'Tất cả size',
+                          isSelected: tempSize == null || tempSize == 'all',
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() => tempSize = null);
+                          },
+                        ),
+                        ...['S', 'M', 'L'].map((size) {
+                          return _buildFilterOptionChip(
+                            label: 'Size $size',
+                            isSelected: tempSize == size,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setSheetState(() => tempSize = (tempSize == size ? null : size));
+                            },
+                          );
+                        }),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Section: Bộ sưu tập
+                    const Text('Bộ sưu tập', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.ink)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterOptionChip(
+                          label: 'Tất cả BST',
+                          isSelected: tempCollection == null || tempCollection == 'all',
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() => tempCollection = null);
+                          },
+                        ),
+                        _buildFilterOptionChip(
+                          label: 'Sunset SS26 🌅',
+                          isSelected: tempCollection == 'SUNSET',
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() => tempCollection = (tempCollection == 'SUNSET' ? null : 'SUNSET'));
+                          },
+                        ),
+                        _buildFilterOptionChip(
+                          label: 'Cơ bản (Regular)',
+                          isSelected: tempCollection == 'REGULAR',
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() => tempCollection = (tempCollection == 'REGULAR' ? null : 'REGULAR'));
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: const BorderSide(color: AppColors.sand300),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              provider.clearFilters();
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Thiết lập lại'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.clay500,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              provider.setMultiFilters(
+                                minPrice: tempMin,
+                                maxPrice: tempMax,
+                                size: tempSize,
+                                collection: tempCollection,
+                              );
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Áp dụng bộ lọc', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterOptionChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => onTap(),
+      selectedColor: AppColors.clay500,
+      backgroundColor: AppColors.sand100,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : AppColors.ink,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+        fontSize: 12.5,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: isSelected ? AppColors.clay500 : AppColors.sand200),
+      ),
+      showCheckmark: false,
+    );
+  }
+
+  String _formatFilterPrice(double? min, double? max) {
+    if (min == null && max != null) return '< 500k';
+    if (min != null && max != null) return '500k - 1tr';
+    if (min != null && max == null) return '> 1tr';
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final productProvider = context.watch<ProductProvider>();
     final cart = context.watch<CartProvider>();
     final products = productProvider.filteredProducts;
+    final hasPriceFilter = productProvider.minPrice != null || productProvider.maxPrice != null;
+    final hasSizeFilter = productProvider.selectedSize != null && productProvider.selectedSize != 'all';
+    final hasCollectionFilter = productProvider.selectedCollection != null && productProvider.selectedCollection != 'all';
+    final isAnyFilterActive = hasPriceFilter || hasSizeFilter || hasCollectionFilter;
 
-    final categories = [
+    final List<Map<String, String>> categories = [
       {'id': 'all', 'label': 'Tất cả'},
       {'id': 'sunset', 'label': 'Sunset SS26 🌅'},
-      {'id': 'ao', 'label': 'Áo thiết kế'},
-      {'id': 'quan', 'label': 'Quần & Váy'},
     ];
+
+    if (productProvider.categories.isNotEmpty) {
+      for (final cat in productProvider.categories) {
+        categories.add({'id': cat.slug, 'label': cat.name});
+      }
+    } else {
+      categories.addAll([
+        {'id': 'ao', 'label': 'Áo thiết kế'},
+        {'id': 'quan', 'label': 'Quần & Váy'},
+      ]);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.sand50,
@@ -92,31 +368,37 @@ class _ProductListScreenState extends State<ProductListScreen> {
         children: [
           // Search Bar & Sort
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (val) => productProvider.setSearchQuery(val),
-                    decoration: InputDecoration(
-                      hintText: 'Tìm kiếm đầm, áo yếm, chân váy...',
-                      prefixIcon: const Icon(Icons.search, color: AppColors.mute, size: 20),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () {
-                                _searchController.clear();
-                                productProvider.setSearchQuery('');
-                              },
-                            )
-                          : null,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      filled: true,
-                      fillColor: AppColors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: const BorderSide(color: AppColors.sand200),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8)),
+                      boxShadow: AppColors.cardShadow,
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) => productProvider.setSearchQuery(val),
+                      decoration: InputDecoration(
+                        hintText: 'Tìm kiếm đầm, áo yếm, chân váy...',
+                        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.mute, size: 20),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  productProvider.setSearchQuery('');
+                                },
+                              )
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                       ),
                     ),
                   ),
@@ -127,10 +409,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: AppColors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.sand200),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8)),
+                      boxShadow: AppColors.cardShadow,
                     ),
-                    child: const Icon(Icons.sort, color: AppColors.ink, size: 20),
+                    child: const Icon(Icons.tune_rounded, color: AppColors.ink, size: 20),
                   ),
                   tooltip: 'Sắp xếp',
                   initialValue: productProvider.sortBy,
@@ -140,6 +423,26 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     const PopupMenuItem(value: 'price_asc', child: Text('Giá: Thấp đến Cao')),
                     const PopupMenuItem(value: 'price_desc', child: Text('Giá: Cao đến Thấp')),
                   ],
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => _showFilterSheet(context, productProvider),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: hasPriceFilter ? AppColors.clay500 : AppColors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: hasPriceFilter ? AppColors.clay500 : AppColors.sand200.withValues(alpha: 0.8),
+                      ),
+                      boxShadow: AppColors.cardShadow,
+                    ),
+                    child: Icon(
+                      Icons.filter_list_rounded,
+                      color: hasPriceFilter ? Colors.white : AppColors.ink,
+                      size: 20,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -154,7 +457,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 final isSelected = productProvider.selectedCategory == cat['id'];
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
+                  child: ChoiceChip(
                     label: Text(cat['label']!),
                     selected: isSelected,
                     onSelected: (_) => productProvider.setCategory(cat['id']!),
@@ -162,13 +465,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     backgroundColor: AppColors.white,
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.white : AppColors.ink,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                       fontSize: 12,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                       side: BorderSide(
                         color: isSelected ? AppColors.clay500 : AppColors.sand200,
+                        width: 0.8,
                       ),
                     ),
                     showCheckmark: false,
@@ -178,69 +482,156 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
           ),
 
+          // Active Filter Chips Row if any
+          if (isAnyFilterActive)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  if (hasPriceFilter)
+                    _buildActiveTag(
+                      label: 'Giá: ${_formatFilterPrice(productProvider.minPrice, productProvider.maxPrice)}',
+                      onRemove: () {
+                        HapticFeedback.lightImpact();
+                        productProvider.setPriceRange(null, null);
+                      },
+                    ),
+                  if (hasSizeFilter)
+                    _buildActiveTag(
+                      label: 'Size: ${productProvider.selectedSize}',
+                      onRemove: () {
+                        HapticFeedback.lightImpact();
+                        productProvider.setSizeFilter(null);
+                      },
+                    ),
+                  if (hasCollectionFilter)
+                    _buildActiveTag(
+                      label: 'BST: ${productProvider.selectedCollection == 'SUNSET' ? 'Sunset 🌅' : 'Cơ bản'}',
+                      onRemove: () {
+                        HapticFeedback.lightImpact();
+                        productProvider.setCollectionFilter(null);
+                      },
+                    ),
+                  TextButton(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      productProvider.clearFilters();
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Xóa tất cả', style: TextStyle(fontSize: 11.5, color: Colors.red)),
+                  ),
+                ],
+              ),
+            ),
+
           // Product Count Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${products.length} sản phẩm',
-                  style: const TextStyle(fontSize: 13, color: AppColors.mute, fontWeight: FontWeight.w500),
+                  '${products.length} thiết kế',
+                  style: const TextStyle(fontSize: 12.5, color: AppColors.mute, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   productProvider.sortBy == 'price_asc'
                       ? 'Giá: Thấp → Cao'
                       : (productProvider.sortBy == 'price_desc' ? 'Giá: Cao → Thấp' : 'Mới nhất'),
-                  style: const TextStyle(fontSize: 12, color: AppColors.clay600, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.clay600, fontWeight: FontWeight.w600),
                 ),
               ],
             ),
           ),
 
-          // Product Grid
+          // Product Grid or Shimmer Loading
           Expanded(
-            child: products.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.search_off, size: 64, color: AppColors.sand300),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Không tìm thấy sản phẩm nào phù hợp',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ink),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Thử tìm từ khóa khác hoặc xóa bộ lọc',
-                          style: TextStyle(fontSize: 13, color: AppColors.mute),
-                        ),
-                        const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: () {
-                            _searchController.clear();
-                            productProvider.setSearchQuery('');
-                            productProvider.setCategory('all');
-                          },
-                          child: const Text('Xem tất cả sản phẩm', style: TextStyle(color: AppColors.clay600)),
-                        ),
-                      ],
-                    ),
-                  )
-                : GridView.builder(
+            child: productProvider.isLoading
+                ? GridView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      childAspectRatio: 0.58,
+                      childAspectRatio: 0.57,
                       crossAxisSpacing: 12,
-                      mainAxisSpacing: 16,
+                      mainAxisSpacing: 14,
                     ),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      return ProductCard(product: products[index]);
-                    },
-                  ),
+                    itemCount: 6,
+                    itemBuilder: (context, index) => const ProductCardSkeleton(),
+                  )
+                : products.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.search_off_rounded, size: 56, color: AppColors.sand300),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Không tìm thấy sản phẩm phù hợp',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ink),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Thử tìm từ khóa khác hoặc xóa bộ lọc',
+                              style: TextStyle(fontSize: 12, color: AppColors.mute),
+                            ),
+                            const SizedBox(height: 14),
+                            ElevatedButton(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                _searchController.clear();
+                                productProvider.clearFilters();
+                              },
+                              child: const Text('Xem tất cả sản phẩm'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.57,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 14,
+                        ),
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          return ProductCard(
+                            product: products[index],
+                            heroPrefix: 'list',
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveTag({required String label, required VoidCallback onRemove}) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.clay100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11.5, color: AppColors.clay700, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(Icons.close, size: 14, color: AppColors.clay700),
           ),
         ],
       ),

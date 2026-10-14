@@ -9,7 +9,7 @@ import 'package:la_boutique_mobile/views/widgets/product_card.dart';
 void main() {
   testWidgets('ProductCard Widget Test validates UI rendering and action', (WidgetTester tester) async {
     final testProduct = Product(
-      id: 99,
+      id: '99',
       name: 'Váy Lụa Hoàng Hôn',
       slug: 'vay-lua-hoang-hon',
       price: 550000,

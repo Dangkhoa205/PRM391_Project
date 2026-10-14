@@ -120,10 +120,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         bottomLeft: isUser ? const Radius.circular(14) : const Radius.circular(2),
                         bottomRight: isUser ? const Radius.circular(2) : const Radius.circular(14),
                       ),
-                      border: isUser ? null : Border.all(color: AppColors.sand200),
+                      border: isUser ? null : Border.all(color: AppColors.sand200.withValues(alpha: 0.8)),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.ink.withOpacity(0.04),
+                          color: AppColors.ink.withValues(alpha: 0.04),
                           blurRadius: 4,
                           offset: const Offset(0, 1),
                         ),
@@ -144,7 +144,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         Text(
                           Formatters.formatDateShort(msg.timestamp),
                           style: TextStyle(
-                            color: isUser ? Colors.white.withOpacity(0.7) : AppColors.mute.withOpacity(0.7),
+                            color: isUser ? Colors.white.withValues(alpha: 0.7) : AppColors.mute.withValues(alpha: 0.7),
                             fontSize: 10,
                           ),
                         ),
@@ -163,13 +163,14 @@ class _ChatScreenState extends State<ChatScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _quickPrompts.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 return ActionChip(
                   label: Text(_quickPrompts[index]),
                   onPressed: () => _sendMessage(_quickPrompts[index]),
                   backgroundColor: AppColors.white,
-                  side: const BorderSide(color: AppColors.sand300),
+                  side: BorderSide(color: AppColors.sand200.withValues(alpha: 0.8)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   labelStyle: const TextStyle(fontSize: 11, color: AppColors.ink, fontWeight: FontWeight.w500),
                 );
               },

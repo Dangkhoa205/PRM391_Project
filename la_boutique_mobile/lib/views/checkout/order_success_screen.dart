@@ -33,11 +33,11 @@ class OrderSuccessScreen extends StatelessWidget {
                 width: 90,
                 height: 90,
                 decoration: BoxDecoration(
-                  color: AppColors.clay500.withOpacity(0.12),
+                  color: AppColors.clay500.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
-                  child: Icon(Icons.check_circle, size: 60, color: AppColors.clay500),
+                  child: Icon(Icons.check_circle_rounded, size: 60, color: AppColors.clay500),
                 ),
               ),
               const SizedBox(height: 24),
@@ -67,14 +67,8 @@ class OrderSuccessScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.sand200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.ink.withOpacity(0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8)),
+                  boxShadow: AppColors.cardShadow,
                 ),
                 child: Column(
                   children: [

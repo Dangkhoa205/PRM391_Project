@@ -1,27 +1,51 @@
 import 'package:flutter/foundation.dart';
-import '../models/product.dart';
+import '../core/constants/api_constants.dart';
 import '../data/mock_data.dart';
+import '../models/category_model.dart';
+import '../models/product.dart';
+import '../services/api_service.dart';
 
 class ProductProvider extends ChangeNotifier {
+  final ApiService _api = ApiService();
+
   List<Product> _products = [];
+  List<CategoryModel> _categories = [];
+  bool _isLoading = false;
   String _selectedCategory = 'all'; // 'all', 'sunset', 'ao', 'quan'
   String _searchQuery = '';
   String _sortBy = 'newest'; // 'newest', 'price_asc', 'price_desc'
-  final Set<int> _wishlistIds = {};
-
-  ProductProvider() {
-    _products = List.from(MockData.initialProducts);
-  }
+  double? _minPrice;
+  double? _maxPrice;
+  String? _selectedSize; // null or 'S', 'M', 'L'
+  String? _selectedCollection; // null or 'SUNSET', 'REGULAR'
+  final Set<String> _wishlistIds = {};
 
   List<Product> get allProducts => _products;
+  List<CategoryModel> get categories => _categories;
+  bool get isLoading => _isLoading;
   String get selectedCategory => _selectedCategory;
   String get searchQuery => _searchQuery;
   String get sortBy => _sortBy;
-  Set<int> get wishlistIds => _wishlistIds;
+  double? get minPrice => _minPrice;
+  double? get maxPrice => _maxPrice;
+  String? get selectedSize => _selectedSize;
+  String? get selectedCollection => _selectedCollection;
+  Set<String> get wishlistIds => _wishlistIds;
 
-  bool isFavorite(int productId) => _wishlistIds.contains(productId);
+  ProductProvider() {
+    // Start with mock products for instant UI display
+    _products = List.from(MockData.initialProducts);
+    _initData();
+  }
 
-  void toggleFavorite(int productId) {
+  Future<void> _initData() async {
+    await fetchCategories();
+    await fetchProducts();
+  }
+
+  bool isFavorite(String productId) => _wishlistIds.contains(productId);
+
+  void toggleFavorite(String productId) {
     if (_wishlistIds.contains(productId)) {
       _wishlistIds.remove(productId);
     } else {
@@ -33,6 +57,7 @@ class ProductProvider extends ChangeNotifier {
   void setCategory(String category) {
     _selectedCategory = category;
     notifyListeners();
+    fetchProducts();
   }
 
   void setSearchQuery(String query) {
@@ -43,18 +68,164 @@ class ProductProvider extends ChangeNotifier {
   void setSortBy(String sort) {
     _sortBy = sort;
     notifyListeners();
+    fetchProducts();
+  }
+
+  void setPriceRange(double? min, double? max) {
+    _minPrice = min;
+    _maxPrice = max;
+    notifyListeners();
+    fetchProducts();
+  }
+
+  void setSizeFilter(String? size) {
+    _selectedSize = size;
+    notifyListeners();
+  }
+
+  void setCollectionFilter(String? collection) {
+    _selectedCollection = collection;
+    notifyListeners();
+  }
+
+  void setMultiFilters({
+    String? category,
+    double? minPrice,
+    double? maxPrice,
+    String? size,
+    String? collection,
+  }) {
+    if (category != null) _selectedCategory = category;
+    _minPrice = minPrice;
+    _maxPrice = maxPrice;
+    _selectedSize = size;
+    _selectedCollection = collection;
+    notifyListeners();
+    fetchProducts();
+  }
+
+  void clearFilters() {
+    _selectedCategory = 'all';
+    _searchQuery = '';
+    _sortBy = 'newest';
+    _minPrice = null;
+    _maxPrice = null;
+    _selectedSize = null;
+    _selectedCollection = null;
+    notifyListeners();
+    fetchProducts();
+  }
+
+  Future<void> fetchCategories() async {
+    try {
+      final result = await _api.get(
+        ApiConstants.categories,
+        queryParams: {'size': 50, 'sort': 'createdAt,desc'},
+        requiresAuth: false,
+      );
+
+      if (result != null && result is Map<String, dynamic> && result['content'] is List) {
+        final list = (result['content'] as List)
+            .map((c) => CategoryModel.fromJson(c as Map<String, dynamic>))
+            .toList();
+        if (list.isNotEmpty) {
+          _categories = list;
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('[ProductProvider] fetchCategories fallback: $e');
+    }
+  }
+
+  Future<void> fetchProducts() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final queryParams = <String, dynamic>{
+        'size': 50,
+      };
+
+      if (_selectedCategory == 'sunset') {
+        queryParams['collection'] = 'SUNSET';
+      } else if (_selectedCategory != 'all' && _selectedCategory.isNotEmpty) {
+        queryParams['category'] = _selectedCategory;
+      }
+
+      if (_searchQuery.trim().isNotEmpty) {
+        queryParams['search'] = _searchQuery.trim();
+      }
+
+      if (_minPrice != null && _minPrice! > 0) {
+        queryParams['minPrice'] = _minPrice!.toInt();
+      }
+      if (_maxPrice != null && _maxPrice! > 0) {
+        queryParams['maxPrice'] = _maxPrice!.toInt();
+      }
+
+      if (_sortBy == 'price_asc') {
+        queryParams['sort'] = 'price,asc';
+      } else if (_sortBy == 'price_desc') {
+        queryParams['sort'] = 'price,desc';
+      } else {
+        queryParams['sort'] = 'createdAt,desc';
+      }
+
+      final result = await _api.get(
+        ApiConstants.products,
+        queryParams: queryParams,
+        requiresAuth: false,
+      );
+
+      if (result != null && result is Map<String, dynamic> && result['content'] is List) {
+        final list = (result['content'] as List)
+            .map((p) => Product.fromJson(p as Map<String, dynamic>))
+            .toList();
+
+        if (list.isNotEmpty) {
+          _products = list;
+        }
+      }
+    } catch (e) {
+      debugPrint('[ProductProvider] fetchProducts BE offline, using local data: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Product?> fetchProductDetail(String idOrSlug) async {
+    try {
+      final isUuid = idOrSlug.length > 20 && idOrSlug.contains('-');
+      final endpoint = isUuid
+          ? ApiConstants.productById(idOrSlug)
+          : ApiConstants.productBySlug(idOrSlug);
+
+      final result = await _api.get(endpoint, requiresAuth: false);
+      if (result != null && result is Map<String, dynamic>) {
+        return Product.fromJson(result);
+      }
+    } catch (e) {
+      debugPrint('[ProductProvider] fetchProductDetail error: $e');
+    }
+
+    // Fallback to in-memory product
+    try {
+      return _products.firstWhere((p) => p.id == idOrSlug || p.slug == idOrSlug);
+    } catch (_) {
+      return null;
+    }
   }
 
   List<Product> get filteredProducts {
     List<Product> list = List.from(_products);
 
-    // 1. Filter by Category
+    // 1. Filter by Category / Collection
     if (_selectedCategory == 'sunset') {
-      list = list.where((p) => p.collection == 'sunset').toList();
-    } else if (_selectedCategory == 'ao') {
-      list = list.where((p) => p.type == 'ao').toList();
-    } else if (_selectedCategory == 'quan') {
-      list = list.where((p) => p.type == 'quan').toList();
+      list = list.where((p) => p.collection.toUpperCase() == 'SUNSET').toList();
+    } else if (_selectedCategory != 'all' && _selectedCategory.isNotEmpty) {
+      list = list.where((p) => p.type.toLowerCase() == _selectedCategory.toLowerCase()).toList();
     }
 
     // 2. Filter by Search Query
@@ -67,28 +238,43 @@ class ProductProvider extends ChangeNotifier {
       }).toList();
     }
 
-    // 3. Sort
+    // 3. Filter by Collection (if specifically set from Multi-Filter)
+    if (_selectedCollection != null && _selectedCollection != 'all') {
+      list = list.where((p) => p.collection.toUpperCase() == _selectedCollection!.toUpperCase()).toList();
+    }
+
+    // 4. Filter by Size
+    if (_selectedSize != null && _selectedSize != 'all') {
+      list = list.where((p) => p.isSizeInStock(_selectedSize!)).toList();
+    }
+
+    // 5. Filter by Price Range
+    if (_minPrice != null) {
+      list = list.where((p) => p.price >= _minPrice!).toList();
+    }
+    if (_maxPrice != null) {
+      list = list.where((p) => p.price <= _maxPrice!).toList();
+    }
+
+    // 6. Sort
     if (_sortBy == 'price_asc') {
       list.sort((a, b) => a.price.compareTo(b.price));
     } else if (_sortBy == 'price_desc') {
       list.sort((a, b) => b.price.compareTo(a.price));
-    } else {
-      // newest by id desc
-      list.sort((a, b) => b.id.compareTo(a.id));
     }
 
     return list;
   }
 
   List<Product> get sunsetCollection {
-    return _products.where((p) => p.collection == 'sunset').toList();
+    return _products.where((p) => p.collection.toUpperCase() == 'SUNSET').toList();
   }
 
   List<Product> get featuredProducts {
     return _products.where((p) => p.isFeatured || (p.tag != null)).toList();
   }
 
-  Product? getProductById(int id) {
+  Product? getProductById(String id) {
     try {
       return _products.firstWhere((p) => p.id == id);
     } catch (_) {

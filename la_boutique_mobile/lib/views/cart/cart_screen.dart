@@ -99,25 +99,39 @@ class _CartScreenState extends State<CartScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Free shipping notice
+                  // Free shipping notice with progress bar
                   Container(
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
                       color: AppColors.clay50,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColors.clay200),
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        const Icon(Icons.local_shipping_outlined, color: AppColors.clay500, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            cart.subtotal >= 1000000
-                                ? '🎉 Đơn hàng của bạn đã đủ điều kiện FREESHIP!'
-                                : 'Mua thêm ${Formatters.formatCurrency(1000000 - cart.subtotal)} để được FREESHIP',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.clay700),
+                        Row(
+                          children: [
+                            const Icon(Icons.local_shipping_outlined, color: AppColors.clay500, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                cart.subtotal >= 1000000
+                                    ? '🎉 Đơn hàng của bạn đã đủ điều kiện FREESHIP!'
+                                    : 'Mua thêm ${Formatters.formatCurrency(1000000 - cart.subtotal)} để được FREESHIP',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.clay700),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: (cart.subtotal / 1000000).clamp(0.0, 1.0),
+                            backgroundColor: AppColors.sand200,
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.clay500),
+                            minHeight: 4,
                           ),
                         ),
                       ],
@@ -129,7 +143,7 @@ class _CartScreenState extends State<CartScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = items[index];
                       final key = item.uniqueKey;
@@ -138,8 +152,9 @@ class _CartScreenState extends State<CartScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: AppColors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.sand200),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8)),
+                          boxShadow: AppColors.cardShadow,
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,11 +404,18 @@ class _CartScreenState extends State<CartScreen> {
       bottomNavigationBar: items.isEmpty
           ? null
           : Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: AppColors.white,
+                border: Border(
+                  top: BorderSide(color: AppColors.sand200.withValues(alpha: 0.8), width: 0.8),
+                ),
                 boxShadow: [
-                  BoxShadow(color: AppColors.ink.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, -3)),
+                  BoxShadow(
+                    color: AppColors.ink.withValues(alpha: 0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, -3),
+                  ),
                 ],
               ),
               child: SafeArea(
@@ -403,10 +425,10 @@ class _CartScreenState extends State<CartScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Tổng tiền', style: TextStyle(fontSize: 12, color: AppColors.mute)),
+                        const Text('Tổng thanh toán', style: TextStyle(fontSize: 11.5, color: AppColors.mute)),
                         Text(
                           Formatters.formatCurrency(cart.totalAmount),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.clay600),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.clay600),
                         ),
                       ],
                     ),
@@ -414,8 +436,11 @@ class _CartScreenState extends State<CartScreen> {
                     Expanded(
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          backgroundColor: AppColors.clay500,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 2,
                         ),
                         onPressed: () {
                           Navigator.push(
@@ -423,7 +448,7 @@ class _CartScreenState extends State<CartScreen> {
                             MaterialPageRoute(builder: (_) => const CheckoutScreen()),
                           );
                         },
-                        child: const Text('TIẾN HÀNH ĐẶT HÀNG', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text('TIẾN HÀNH ĐẶT HÀNG', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
                     ),
                   ],

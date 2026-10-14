@@ -149,7 +149,7 @@ class _OrderLookupScreenState extends State<OrderLookupScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: _searchResults!.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final order = _searchResults![index];
                     final statusColor = _getStatusColor(order.status);
@@ -158,8 +158,9 @@ class _OrderLookupScreenState extends State<OrderLookupScreen> {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppColors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.sand200),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8)),
+                        boxShadow: AppColors.cardShadow,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,9 +175,9 @@ class _OrderLookupScreenState extends State<OrderLookupScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: statusColor.withOpacity(0.12),
+                                  color: statusColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: statusColor.withOpacity(0.3)),
+                                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                                 ),
                                 child: Text(
                                   order.status,

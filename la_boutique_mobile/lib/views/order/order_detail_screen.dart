@@ -1,0 +1,347 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
+import '../../models/order.dart';
+import '../../providers/order_provider.dart';
+
+class OrderDetailScreen extends StatefulWidget {
+  final String orderNumber;
+
+  const OrderDetailScreen({super.key, required this.orderNumber});
+
+  @override
+  State<OrderDetailScreen> createState() => _OrderDetailScreenState();
+}
+
+class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  OrderModel? _order;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrder();
+  }
+
+  Future<void> _loadOrder() async {
+    setState(() => _isLoading = true);
+    final order = await context.read<OrderProvider>().fetchOrderDetail(widget.orderNumber);
+    if (mounted) {
+      setState(() {
+        _order = order;
+        _isLoading = false;
+      });
+    }
+  }
+
+  int _getStatusStep(String status) {
+    switch (status.toUpperCase()) {
+      case 'PENDING':
+      case 'CHỜ XÁC NHẬN':
+        return 0;
+      case 'CONFIRMED':
+      case 'ĐÃ XÁC NHẬN':
+      case 'ĐANG XỬ LÝ':
+        return 1;
+      case 'SHIPPING':
+      case 'ĐANG GIAO HÀNG':
+        return 2;
+      case 'COMPLETED':
+      case 'HOÀN THÀNH':
+        return 3;
+      case 'CANCELLED':
+      case 'ĐÃ HỦY':
+        return -1;
+      default:
+        return 0;
+    }
+  }
+
+  Widget _buildStatusTracker(String status) {
+    final step = _getStatusStep(status);
+    final isCancelled = step == -1;
+
+    if (isCancelled) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.cancel, color: Colors.red.shade700, size: 24),
+            const SizedBox(width: 10),
+            Text(
+              'Đơn hàng này đã bị hủy',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade800),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final steps = ['Chờ xác nhận', 'Đã xác nhận', 'Đang giao', 'Hoàn thành'];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.sand200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('TIẾN TRÌNH ĐƠN HÀNG', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.mute)),
+          const SizedBox(height: 16),
+          Row(
+            children: List.generate(steps.length * 2 - 1, (index) {
+              if (index.isOdd) {
+                // Divider line between steps
+                final lineIdx = index ~/ 2;
+                final isCompleted = lineIdx < step;
+                return Expanded(
+                  child: Container(
+                    height: 2.5,
+                    color: isCompleted ? AppColors.clay500 : AppColors.sand300,
+                  ),
+                );
+              }
+
+              final stepIdx = index ~/ 2;
+              final isReached = stepIdx <= step;
+              final isCurrent = stepIdx == step;
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isReached ? AppColors.clay500 : AppColors.sand200,
+                      border: isCurrent
+                          ? Border.all(color: AppColors.clay300, width: 3)
+                          : null,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        isReached ? Icons.check : Icons.circle,
+                        size: 12,
+                        color: isReached ? Colors.white : AppColors.mute,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    steps[stepIdx],
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      color: isCurrent ? AppColors.clay700 : AppColors.mute,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.sand50,
+        appBar: AppBar(title: Text(widget.orderNumber)),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.clay500)),
+      );
+    }
+
+    if (_order == null) {
+      return Scaffold(
+        backgroundColor: AppColors.sand50,
+        appBar: AppBar(title: const Text('CHI TIẾT ĐƠN HÀNG')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 50, color: Colors.red),
+              const SizedBox(height: 12),
+              const Text('Không tìm thấy thông tin đơn hàng này'),
+              const SizedBox(height: 16),
+              ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('QUAY LẠI')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final order = _order!;
+
+    return Scaffold(
+      backgroundColor: AppColors.sand50,
+      appBar: AppBar(
+        title: Text('ĐƠN HÀNG #${order.displayOrderNumber}'),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status tracker
+            _buildStatusTracker(order.status),
+            const SizedBox(height: 14),
+
+            // Receiver Info
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.sand200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.location_on_outlined, color: AppColors.clay500, size: 18),
+                      SizedBox(width: 8),
+                      Text('ĐỊA CHỈ NHẬN HÀNG', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.ink)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text('${order.customerName} • ${order.phone}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  const SizedBox(height: 4),
+                  Text(order.address, style: const TextStyle(fontSize: 12.5, color: AppColors.mute, height: 1.35)),
+                  if (order.note != null && order.note!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text('Ghi chú: ${order.note}', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.clay600)),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Ordered items list
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.sand200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('DANH SÁCH MÓN HÀNG (${order.totalItems} MÓN)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.mute)),
+                  const SizedBox(height: 12),
+                  ...order.items.map((item) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: 55,
+                              height: 70,
+                              child: item.product.assetPath.startsWith('http')
+                                  ? Image.network(item.product.assetPath, fit: BoxFit.cover)
+                                  : Image.asset(item.product.assetPath, fit: BoxFit.cover),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), maxLines: 2),
+                                const SizedBox(height: 3),
+                                Text('Size: ${item.size} • Số lượng: ${item.quantity}', style: const TextStyle(fontSize: 11.5, color: AppColors.mute)),
+                                const SizedBox(height: 4),
+                                Text(Formatters.formatCurrency(item.totalPrice), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.clay600, fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Invoice Breakdown
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.sand200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('CHI TIẾT THANH TOÁN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.mute)),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Tạm tính', style: TextStyle(color: AppColors.mute, fontSize: 13)),
+                      Text(Formatters.formatCurrency(order.subtotal), style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  if (order.discount > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Giảm giá', style: TextStyle(color: AppColors.success, fontSize: 13)),
+                        Text('-${Formatters.formatCurrency(order.discount)}', style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Phí giao hàng', style: TextStyle(color: AppColors.mute, fontSize: 13)),
+                      Text(
+                        order.shippingFee == 0 ? 'MIỄN PHÍ' : Formatters.formatCurrency(order.shippingFee),
+                        style: TextStyle(color: order.shippingFee == 0 ? AppColors.success : AppColors.ink, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20, color: AppColors.sand200),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Tổng thanh toán', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(
+                        Formatters.formatCurrency(order.total),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.clay600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Phương thức: ${order.paymentMethodText}', style: const TextStyle(fontSize: 12, color: AppColors.mute)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}

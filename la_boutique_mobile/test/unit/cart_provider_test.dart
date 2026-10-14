@@ -11,7 +11,7 @@ void main() {
     setUp(() {
       cartProvider = CartProvider();
       testProduct1 = Product(
-        id: 1,
+        id: '1',
         name: 'Set La Boutique Sunset',
         slug: 'set-la-boutique-sunset',
         price: 720000,
@@ -22,7 +22,7 @@ void main() {
         gallery: ['assets/images/products/sunset-main-1.jpg'],
       );
       testProduct2 = Product(
-        id: 4,
+        id: '4',
         name: 'Áo Cổ Yếm tơ xốp',
         slug: 'ao-co-yem-to-xop',
         price: 310000,

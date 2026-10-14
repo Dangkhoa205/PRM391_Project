@@ -7,7 +7,7 @@ class MockData {
   static final List<Product> initialProducts = [
     // 1. BỘ SƯU TẬP BIỂU TƯỢNG: LA BOUTIQUE VN SUNSET
     Product(
-      id: 1,
+      id: "1",
       name: "Set La Boutique Sunset",
       slug: "set-la-boutique-sunset",
       price: 720000,
@@ -31,7 +31,7 @@ class MockData {
       careInstructions: "Giặt tay nhẹ nhàng bằng nước lạnh, phơi trong bóng râm",
     ),
     Product(
-      id: 2,
+      id: "2",
       name: "Set La Boutique Sunset ss 26-1",
       slug: "set-la-boutique-sunset-ss-26-1",
       price: 630000,
@@ -53,7 +53,7 @@ class MockData {
       careInstructions: "Giặt nước mát, ủi mặt trái ở nhiệt độ thấp",
     ),
     Product(
-      id: 3,
+      id: "3",
       name: "Set La Boutique Sunset ss 26-2",
       slug: "set-la-boutique-sunset-ss-26-2",
       price: 600000,
@@ -77,7 +77,7 @@ class MockData {
 
     // 2. TỦ ĐỒ MÙA HÈ: ÁO CỔ YẾM, ÁO XÔ & ĐẦM THIẾT KẾ
     Product(
-      id: 4,
+      id: "4",
       name: "Áo Cổ Yếm tơ xốp đan dây ngực",
       slug: "ao-co-yem-to-xop-dan-day-nguc",
       price: 310000,
@@ -100,7 +100,7 @@ class MockData {
       careInstructions: "Giặt tay nước lạnh, phơi ngang",
     ),
     Product(
-      id: 5,
+      id: "5",
       name: "Áo Xô 2 dây cột nơ vai chiết",
       slug: "ao-xo-2-day-cot-no-vai-chiet",
       price: 370000,
@@ -123,7 +123,7 @@ class MockData {
       careInstructions: "Giặt nước mát, phơi tự nhiên",
     ),
     Product(
-      id: 6,
+      id: "6",
       name: "Áo Xô Cổ Yếm xẻ ngực viền ren",
       slug: "ao-xo-co-yem-xe-nguc-vien-ren",
       price: 320000,
@@ -146,7 +146,7 @@ class MockData {
       careInstructions: "Giặt tay nhẹ nhàng trong túi giặt",
     ),
     Product(
-      id: 7,
+      id: "7",
       name: "Đầm Thun dáng ngắn hở lưng",
       slug: "dam-thun-dang-ngan-ho-lung",
       price: 435000,
@@ -169,7 +169,7 @@ class MockData {
       careInstructions: "Giặt nước lạnh, không dùng chất tẩy mạnh",
     ),
     Product(
-      id: 8,
+      id: "8",
       name: "Đầm lụa body",
       slug: "dam-lua-body",
       price: 540000,
@@ -194,7 +194,7 @@ class MockData {
 
     // 3. QUẦN & CHÂN VÁY
     Product(
-      id: 9,
+      id: "9",
       name: "Chân Váy lụa lửng",
       slug: "chan-vay-lua-lung",
       price: 385000,
@@ -217,7 +217,7 @@ class MockData {
       careInstructions: "Giặt tay nhẹ nhàng, phơi bóng râm",
     ),
     Product(
-      id: 10,
+      id: "10",
       name: "Váy dệt kim xốp",
       slug: "vay-det-kim-xop",
       price: 400000,
@@ -242,7 +242,7 @@ class MockData {
 
     // 4. CÁC THIẾT KẾ MỞ RỘNG
     Product(
-      id: 11,
+      id: "11",
       name: "Áo Hai Dây Lụa Biển",
       slug: "ao-hai-day-lua-bien",
       price: 239000,
@@ -260,7 +260,7 @@ class MockData {
       careInstructions: "Giặt máy chế độ nhẹ trong túi giặt",
     ),
     Product(
-      id: 12,
+      id: "12",
       name: "Áo Sơ Mi Đũi Oversize",
       slug: "ao-so-mi-dui-oversize",
       price: 269000,
@@ -278,7 +278,7 @@ class MockData {
       careInstructions: "Giặt nước mát, phơi tự nhiên",
     ),
     Product(
-      id: 13,
+      id: "13",
       name: "Áo Croptop Voan Gió Biển",
       slug: "ao-croptop-voan-gio-bien",
       price: 289000,
@@ -296,7 +296,7 @@ class MockData {
       careInstructions: "Giặt tay nhẹ nhàng",
     ),
     Product(
-      id: 14,
+      id: "14",
       name: "Đầm Hai Dây Suông Nắng",
       slug: "dam-hai-day-suong-nang",
       price: 299000,
@@ -314,7 +314,7 @@ class MockData {
       careInstructions: "Phơi nơi râm mát",
     ),
     Product(
-      id: 15,
+      id: "15",
       name: "Quần Short Linen Lưng Thun",
       slug: "quan-short-linen-lung-thun",
       price: 229000,
@@ -332,7 +332,7 @@ class MockData {
       careInstructions: "Giặt máy bình thường",
     ),
     Product(
-      id: 16,
+      id: "16",
       name: "Quần Đũi Ống Suông Đi Biển",
       slug: "quan-dui-ong-suong-di-bien",
       price: 279000,
@@ -350,7 +350,7 @@ class MockData {
       careInstructions: "Ủi mặt trái ở nhiệt độ thấp",
     ),
     Product(
-      id: 17,
+      id: "17",
       name: "Chân Váy Chữ A Voan Tơ",
       slug: "chan-vay-chu-a-voan-to",
       price: 259000,
@@ -368,7 +368,7 @@ class MockData {
       careInstructions: "Giặt nhẹ tay",
     ),
     Product(
-      id: 18,
+      id: "18",
       name: "Chân Váy Maxi Be Cát",
       slug: "chan-vay-maxi-be-cat",
       price: 249000,
