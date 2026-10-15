@@ -1,2 +1,6 @@
 /node_modules/
 /.next/
+
+# IDE / local dev — không commit
+.idea/
+devtools_options.yaml

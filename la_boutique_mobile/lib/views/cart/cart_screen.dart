@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
@@ -26,6 +27,194 @@ class _CartScreenState extends State<CartScreen> {
     return isNetwork
         ? Image.network(path, fit: BoxFit.cover)
         : Image.asset(path, fit: BoxFit.cover);
+  }
+
+  /// Bottom sheet liệt kê toàn bộ voucher dạng "vé" để người dùng bấm áp dụng ngay,
+  /// không cần nhớ/gõ mã. Dữ liệu lấy từ [CartProvider.availableVouchers].
+  void _showVoucherModal(BuildContext context, CartProvider cart) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.sand50,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        // Consumer để trạng thái "đang áp dụng" cập nhật ngay trong sheet khi bấm.
+        return Consumer<CartProvider>(
+          builder: (context, cart, _) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.sand300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Ưu Đãi Dành Cho Nàng 🎟️',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ...CartProvider.availableVouchers.map((v) => _buildVoucherTicket(context, ctx, cart, v)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Một "vé" voucher: cuống trái màu đất mang nhãn giảm, thân phải là mô tả + nút áp dụng.
+  Widget _buildVoucherTicket(BuildContext screenContext, BuildContext sheetContext, CartProvider cart, VoucherInfo v) {
+    final isApplied = cart.appliedVoucher == v.code;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isApplied ? AppColors.clay500 : AppColors.sand200),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Cuống vé bên trái
+            Container(
+              width: 82,
+              decoration: const BoxDecoration(
+                color: AppColors.clay500,
+                borderRadius: BorderRadius.horizontal(left: Radius.circular(14)),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.local_offer, color: Colors.white, size: 22),
+                    const SizedBox(height: 6),
+                    Text(
+                      v.badge,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Thân vé bên phải
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.sand100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            v.code,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.clay700, letterSpacing: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      v.title,
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.ink),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      v.description,
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.mute, height: 1.3),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 34,
+                      child: isApplied
+                          ? OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.clay600,
+                                side: const BorderSide(color: AppColors.clay500),
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                cart.removeVoucher();
+                                Navigator.pop(sheetContext);
+                                ScaffoldMessenger.of(screenContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Đã gỡ mã "${v.code}"'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.check_circle, size: 16),
+                              label: const Text('Đang áp dụng • Gỡ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            )
+                          : ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.clay500,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                cart.applyVoucher(v.code);
+                                Navigator.pop(sheetContext);
+                                ScaffoldMessenger.of(screenContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Đã áp dụng "${v.code}" 🎉'),
+                                    backgroundColor: AppColors.success,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                              child: const Text('Áp dụng ngay', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -190,7 +379,10 @@ class _CartScreenState extends State<CartScreen> {
                                         icon: const Icon(Icons.close, size: 18, color: AppColors.mute),
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(),
-                                        onPressed: () => cart.removeItem(key),
+                                        onPressed: () {
+                                          HapticFeedback.lightImpact();
+                                          cart.removeItem(key);
+                                        },
                                       ),
                                     ],
                                   ),
@@ -230,7 +422,10 @@ class _CartScreenState extends State<CartScreen> {
                                         child: Row(
                                           children: [
                                             InkWell(
-                                              onTap: () => cart.updateQuantity(key, item.quantity - 1),
+                                              onTap: () {
+                                                HapticFeedback.selectionClick();
+                                                cart.updateQuantity(key, item.quantity - 1);
+                                              },
                                               child: const Padding(
                                                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                 child: Icon(Icons.remove, size: 14),
@@ -241,7 +436,10 @@ class _CartScreenState extends State<CartScreen> {
                                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                             ),
                                             InkWell(
-                                              onTap: () => cart.updateQuantity(key, item.quantity + 1),
+                                              onTap: () {
+                                                HapticFeedback.selectionClick();
+                                                cart.updateQuantity(key, item.quantity + 1);
+                                              },
                                               child: const Padding(
                                                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                 child: Icon(Icons.add, size: 14),
@@ -278,6 +476,35 @@ class _CartScreenState extends State<CartScreen> {
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink),
                         ),
                         const SizedBox(height: 8),
+
+                        // Mở danh sách voucher có sẵn (dạng vé) để khỏi phải nhớ mã
+                        InkWell(
+                          onTap: () => _showVoucherModal(context, cart),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.clay50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.clay200),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.local_offer_outlined, size: 18, color: AppColors.clay500),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Chọn từ ${CartProvider.availableVouchers.length} ưu đãi có sẵn',
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.clay700),
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right, size: 20, color: AppColors.clay500),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
                         Row(
                           children: [
                             Expanded(
@@ -285,7 +512,7 @@ class _CartScreenState extends State<CartScreen> {
                                 controller: _voucherController,
                                 textCapitalization: TextCapitalization.characters,
                                 decoration: InputDecoration(
-                                  hintText: 'Nhập SUNSET10 hoặc FREESHIP',
+                                  hintText: 'Hoặc nhập mã thủ công',
                                   isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),

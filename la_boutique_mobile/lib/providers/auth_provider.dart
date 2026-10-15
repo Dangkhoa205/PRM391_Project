@@ -47,7 +47,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String usernameOrEmail, String password) async {
+  Future<bool> login(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -56,7 +56,7 @@ class AuthProvider extends ChangeNotifier {
       final result = await _api.post(
         ApiConstants.login,
         body: {
-          'usernameOrEmail': usernameOrEmail.trim(),
+          'email': email.trim(),
           'password': password,
         },
         requiresAuth: false,
@@ -112,8 +112,8 @@ class AuthProvider extends ChangeNotifier {
         requiresAuth: false,
       );
 
-      // 2. Automatically log in after registration
-      final loginSuccess = await login(username.trim(), password);
+      // 2. Automatically log in after registration (BE đăng nhập bằng email)
+      final loginSuccess = await login(email.trim(), password);
 
       // 3. If extra profile info was provided, update profile
       if (loginSuccess && (fullName != null || phone != null || address != null)) {

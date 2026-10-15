@@ -18,7 +18,12 @@ class ProductProvider extends ChangeNotifier {
   double? _maxPrice;
   String? _selectedSize; // null or 'S', 'M', 'L'
   String? _selectedCollection; // null or 'SUNSET', 'REGULAR'
+  String? _selectedMaterial; // null or một từ khóa trong materialOptions
   final Set<String> _wishlistIds = {};
+
+  /// Các từ khóa chất liệu để lọc. Vì field `material` là mô tả dài (vd "Lụa tơ tằm & linen"),
+  /// ta lọc theo "có chứa từ khóa" chứ không so khớp tuyệt đối.
+  static const List<String> materialOptions = ['Lụa', 'Linen', 'Cotton', 'Đũi', 'Voan', 'Xô'];
 
   List<Product> get allProducts => _products;
   List<CategoryModel> get categories => _categories;
@@ -30,6 +35,7 @@ class ProductProvider extends ChangeNotifier {
   double? get maxPrice => _maxPrice;
   String? get selectedSize => _selectedSize;
   String? get selectedCollection => _selectedCollection;
+  String? get selectedMaterial => _selectedMaterial;
   Set<String> get wishlistIds => _wishlistIds;
 
   ProductProvider() {
@@ -88,18 +94,25 @@ class ProductProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setMaterialFilter(String? material) {
+    _selectedMaterial = material;
+    notifyListeners();
+  }
+
   void setMultiFilters({
     String? category,
     double? minPrice,
     double? maxPrice,
     String? size,
     String? collection,
+    String? material,
   }) {
     if (category != null) _selectedCategory = category;
     _minPrice = minPrice;
     _maxPrice = maxPrice;
     _selectedSize = size;
     _selectedCollection = collection;
+    _selectedMaterial = material;
     notifyListeners();
     fetchProducts();
   }
@@ -112,6 +125,7 @@ class ProductProvider extends ChangeNotifier {
     _maxPrice = null;
     _selectedSize = null;
     _selectedCollection = null;
+    _selectedMaterial = null;
     notifyListeners();
     fetchProducts();
   }
@@ -246,6 +260,12 @@ class ProductProvider extends ChangeNotifier {
     // 4. Filter by Size
     if (_selectedSize != null && _selectedSize != 'all') {
       list = list.where((p) => p.isSizeInStock(_selectedSize!)).toList();
+    }
+
+    // 4b. Filter by Material (khớp theo từ khóa chứa trong mô tả chất liệu)
+    if (_selectedMaterial != null && _selectedMaterial!.isNotEmpty) {
+      final m = _selectedMaterial!.toLowerCase();
+      list = list.where((p) => p.material?.toLowerCase().contains(m) ?? false).toList();
     }
 
     // 5. Filter by Price Range

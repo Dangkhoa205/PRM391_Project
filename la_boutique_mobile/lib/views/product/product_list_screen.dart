@@ -42,6 +42,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
     double? tempMax = provider.maxPrice;
     String? tempSize = provider.selectedSize;
     String? tempCollection = provider.selectedCollection;
+    String? tempMaterial = provider.selectedMaterial;
 
     showModalBottomSheet(
       context: context,
@@ -212,6 +213,35 @@ class _ProductListScreenState extends State<ProductListScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 18),
+
+                    // Section: Chất liệu
+                    const Text('Chất liệu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.ink)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildFilterOptionChip(
+                          label: 'Tất cả chất liệu',
+                          isSelected: tempMaterial == null,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setSheetState(() => tempMaterial = null);
+                          },
+                        ),
+                        ...ProductProvider.materialOptions.map((mat) {
+                          return _buildFilterOptionChip(
+                            label: mat,
+                            isSelected: tempMaterial == mat,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setSheetState(() => tempMaterial = (tempMaterial == mat ? null : mat));
+                            },
+                          );
+                        }),
+                      ],
+                    ),
                     const SizedBox(height: 24),
 
                     // Actions
@@ -248,6 +278,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                                 maxPrice: tempMax,
                                 size: tempSize,
                                 collection: tempCollection,
+                                material: tempMaterial,
                               );
                               Navigator.pop(ctx);
                             },
@@ -305,7 +336,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final hasPriceFilter = productProvider.minPrice != null || productProvider.maxPrice != null;
     final hasSizeFilter = productProvider.selectedSize != null && productProvider.selectedSize != 'all';
     final hasCollectionFilter = productProvider.selectedCollection != null && productProvider.selectedCollection != 'all';
-    final isAnyFilterActive = hasPriceFilter || hasSizeFilter || hasCollectionFilter;
+    final hasMaterialFilter = productProvider.selectedMaterial != null && productProvider.selectedMaterial!.isNotEmpty;
+    final isAnyFilterActive = hasPriceFilter || hasSizeFilter || hasCollectionFilter || hasMaterialFilter;
 
     final List<Map<String, String>> categories = [
       {'id': 'all', 'label': 'Tất cả'},
@@ -430,16 +462,16 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: hasPriceFilter ? AppColors.clay500 : AppColors.white,
+                      color: isAnyFilterActive ? AppColors.clay500 : AppColors.white,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: hasPriceFilter ? AppColors.clay500 : AppColors.sand200.withValues(alpha: 0.8),
+                        color: isAnyFilterActive ? AppColors.clay500 : AppColors.sand200.withValues(alpha: 0.8),
                       ),
                       boxShadow: AppColors.cardShadow,
                     ),
                     child: Icon(
                       Icons.filter_list_rounded,
-                      color: hasPriceFilter ? Colors.white : AppColors.ink,
+                      color: isAnyFilterActive ? Colors.white : AppColors.ink,
                       size: 20,
                     ),
                   ),
@@ -511,6 +543,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       onRemove: () {
                         HapticFeedback.lightImpact();
                         productProvider.setCollectionFilter(null);
+                      },
+                    ),
+                  if (hasMaterialFilter)
+                    _buildActiveTag(
+                      label: 'Chất liệu: ${productProvider.selectedMaterial}',
+                      onRemove: () {
+                        HapticFeedback.lightImpact();
+                        productProvider.setMaterialFilter(null);
                       },
                     ),
                   TextButton(

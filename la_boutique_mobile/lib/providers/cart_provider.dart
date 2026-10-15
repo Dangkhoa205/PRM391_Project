@@ -2,10 +2,49 @@ import 'package:flutter/foundation.dart';
 import '../models/cart_item.dart';
 import '../models/product.dart';
 
+/// Thông tin hiển thị của một voucher để dựng "vé giảm giá" trong UI.
+/// Mã thật và cách tính giảm vẫn nằm trong [CartProvider.applyVoucher].
+class VoucherInfo {
+  final String code;
+  final String title;
+  final String description;
+  final String badge; // nhãn ngắn hiển thị trên cuống vé, vd "-10%", "-50K", "SHIP"
+
+  const VoucherInfo({
+    required this.code,
+    required this.title,
+    required this.description,
+    required this.badge,
+  });
+}
+
 class CartProvider extends ChangeNotifier {
   final Map<String, CartItem> _items = {};
   String? _appliedVoucher;
   double _voucherDiscount = 0;
+
+  /// Danh sách voucher đang phát hành (hardcode phía app vì BE chưa có bảng voucher).
+  /// Mỗi mã ở đây phải khớp một nhánh trong [applyVoucher].
+  static const List<VoucherInfo> availableVouchers = [
+    VoucherInfo(
+      code: 'SUNSET10',
+      title: 'Giảm 10% toàn bộ đơn',
+      description: 'Ưu đãi BST Sunset SS26 • Không giới hạn giá trị đơn',
+      badge: '-10%',
+    ),
+    VoucherInfo(
+      code: 'LABOUTIQUE50',
+      title: 'Giảm 50.000₫',
+      description: 'Áp dụng cho đơn hàng từ 50.000₫',
+      badge: '-50K',
+    ),
+    VoucherInfo(
+      code: 'FREESHIP',
+      title: 'Miễn phí vận chuyển',
+      description: 'Giao hàng miễn phí cho mọi đơn hàng',
+      badge: 'SHIP',
+    ),
+  ];
 
   Map<String, CartItem> get items => {..._items};
 

@@ -731,6 +731,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                       onPressed: currentInStock
                           ? () {
+                              HapticFeedback.mediumImpact();
                               context.read<CartProvider>().addToCart(
                                     p,
                                     size: _selectedSize,
@@ -793,6 +794,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                       onPressed: currentInStock
                           ? () {
+                              HapticFeedback.mediumImpact();
                               context.read<CartProvider>().addToCart(
                                     p,
                                     size: _selectedSize,

@@ -14,7 +14,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _accountController = TextEditingController(text: 'user');
+  final _accountController = TextEditingController(text: 'user@example.com');
   final _passwordController = TextEditingController(text: 'User@12345');
   bool _obscurePassword = true;
 
@@ -125,9 +125,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _accountController,
                   decoration: InputDecoration(
-                    labelText: 'Tên đăng nhập hoặc Email *',
-                    hintText: 'Nhập username hoặc email',
-                    prefixIcon: const Icon(Icons.person_outline),
+                    labelText: 'Email *',
+                    hintText: 'Nhập email đăng nhập',
+                    prefixIcon: const Icon(Icons.email_outlined),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
@@ -141,7 +141,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) {
-                      return 'Vui lòng nhập tên đăng nhập hoặc email';
+                      return 'Vui lòng nhập email';
+                    }
+                    if (!val.contains('@') || !val.contains('.')) {
+                      return 'Email không hợp lệ';
                     }
                     return null;
                   },
@@ -192,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Tài khoản BE mẫu:\n• Khách hàng: user / User@12345\n• Quản trị viên: admin / Admin@12345',
+                          'Tài khoản BE mẫu (đăng nhập bằng email):\n• Khách hàng: user@example.com / User@12345\n• Quản trị viên: admin@example.com / Admin@12345',
                           style: TextStyle(fontSize: 11, color: Colors.brown.shade800, height: 1.35),
                         ),
                       ),

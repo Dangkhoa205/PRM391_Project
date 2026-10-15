@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/constants/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/order.dart';
@@ -32,6 +35,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _order = order;
         _isLoading = false;
       });
+    }
+  }
+
+  void _copyOrderNumber(String code) {
+    HapticFeedback.lightImpact();
+    Clipboard.setData(ClipboardData(text: code));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Đã sao chép mã đơn #$code 📋'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _launchExternal(Uri uri, String errorMsg) async {
+    HapticFeedback.lightImpact();
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
+        );
+      }
     }
   }
 
@@ -190,6 +224,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       appBar: AppBar(
         title: Text('ĐƠN HÀNG #${order.displayOrderNumber}'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.copy_rounded, size: 20),
+            tooltip: 'Sao chép mã đơn hàng',
+            onPressed: () => _copyOrderNumber(order.displayOrderNumber),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -335,6 +376,72 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text('Phương thức: ${order.paymentMethodText}', style: const TextStyle(fontSize: 12, color: AppColors.mute)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Hỗ trợ đơn hàng: gọi hotline hoặc chat Zalo
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.sand200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.support_agent_outlined, color: AppColors.clay500, size: 18),
+                      SizedBox(width: 8),
+                      Text('CẦN HỖ TRỢ ĐƠN HÀNG?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.ink)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Liên hệ bộ phận CSKH nếu nàng cần đổi/hủy đơn hoặc hỏi về tình trạng giao hàng.',
+                    style: TextStyle(fontSize: 12, color: AppColors.mute, height: 1.35),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.clay600,
+                            side: const BorderSide(color: AppColors.clay500),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _launchExternal(
+                            Uri(scheme: 'tel', path: AppConfig.supportHotline),
+                            'Không mở được ứng dụng gọi điện',
+                          ),
+                          icon: const Icon(Icons.phone_outlined, size: 18),
+                          label: const Text('Gọi hotline', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.clay500,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _launchExternal(
+                            Uri.parse(AppConfig.supportZaloUrl),
+                            'Không mở được Zalo',
+                          ),
+                          icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                          label: const Text('Chat Zalo', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
