@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'dart:ui'; // Cần thiết cho ImageFilter (nếu muốn làm mờ ảnh)
+
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/product.dart';
@@ -9,7 +11,7 @@ import '../../providers/product_provider.dart';
 import '../cart/cart_screen.dart';
 import '../product/product_detail_screen.dart';
 
-class ProductCard extends StatelessWidget {
+class ProductCard extends StatefulWidget {
   final Product product;
   final String? heroPrefix;
 
@@ -19,19 +21,64 @@ class ProductCard extends StatelessWidget {
     this.heroPrefix,
   });
 
-  Widget _buildProductImage() {
-    final path = product.assetPath;
-    final isNetwork = path.startsWith('http://') || path.startsWith('https://');
-    final heroTag = heroPrefix != null ? '${heroPrefix}_${product.id}' : 'product_img_${product.id}';
+  @override
+  State<ProductCard> createState() => _ProductCardState();
+}
 
-    final placeholder = Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.sand100, AppColors.sand200],
+class _ProductCardState extends State<ProductCard> {
+  bool _showSizeOverlay = false;
+
+  void _toggleSizeOverlay() {
+    setState(() {
+      _showSizeOverlay = !_showSizeOverlay;
+    });
+  }
+
+  void _addToCart(String size) {
+    HapticFeedback.mediumImpact();
+
+    // 1. Thêm vào giỏ hàng với đúng size được chọn
+    context.read<CartProvider>().addToCart(widget.product, size: size);
+
+    // 2. Tắt bảng chọn size
+    setState(() {
+      _showSizeOverlay = false;
+    });
+
+    // 3. Xóa thông báo cũ ngay lập tức (nếu đang hiển thị) để hiện thông báo mới
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    // 4. Hiển thị thông báo mới với size ĐỘNG ($size)
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        // Sửa chữ (Size M) thành (Size $size) ở dòng dưới này:
+        content: Text('Đã thêm "${widget.product.name}" (Size $size) vào giỏ'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: AppColors.ink,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        action: SnackBarAction(
+          label: 'XEM GIỎ',
+          textColor: AppColors.sand300,
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            );
+          },
         ),
       ),
+    );
+  }
+  Widget _buildProductImage() {
+    final path = widget.product.assetPath;
+    final isNetwork = path.startsWith('http://') || path.startsWith('https://');
+    final heroTag = widget.heroPrefix != null
+        ? '${widget.heroPrefix}_${widget.product.id}'
+        : 'product_img_${widget.product.id}';
+
+    final placeholder = Container(
+      color: AppColors.sand100,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -54,21 +101,10 @@ class ProductCard extends StatelessWidget {
 
     return Hero(
       tag: heroTag,
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-        child: SizedBox.expand(
-          child: isNetwork
-              ? Image.network(
-                  path,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => placeholder,
-                )
-              : Image.asset(
-                  path,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => placeholder,
-                ),
-        ),
+      child: SizedBox.expand(
+        child: isNetwork
+            ? Image.network(path, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder)
+            : Image.asset(path, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder),
       ),
     );
   }
@@ -76,229 +112,267 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final productProvider = context.watch<ProductProvider>();
-    final isFav = productProvider.isFavorite(product.id);
+    final isFav = productProvider.isFavorite(widget.product.id);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.sand200.withValues(alpha: 0.8), width: 0.8),
-        boxShadow: AppColors.cardShadow,
-      ),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ProductDetailScreen(product: product),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image Stack with Badges
-            Expanded(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. IMAGE SECTION (Ảnh, Tag, Nút Thêm Nhanh/Size)
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              // Bấm vào ảnh để vào trang chi tiết
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ProductDetailScreen(product: widget.product),
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
               child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Positioned.fill(child: _buildProductImage()),
+                  // Ảnh gốc
+                  _buildProductImage(),
 
-                  // Tag Badge (Signature / Mới / Hot)
-                  if (product.tag != null)
+                  // Lớp phủ đen mờ khi mở bảng chọn Size
+                  if (_showSizeOverlay)
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.4),
+                    ),
+
+                  // Tag (MỚI / SIGNATURE / HOT)
+                  if (widget.product.tag != null)
                     Positioned(
-                      top: 8,
-                      left: 8,
+                      top: 10,
+                      left: 10,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: product.tag == 'Signature'
-                              ? AppColors.clay500
-                              : (product.tag == 'Hot' ? const Color(0xFFC84B31) : AppColors.ink),
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
+                          color: widget.product.tag == 'Signature'
+                              ? const Color(0xFFE88A1A) // Màu cam vàng như thiết kế
+                              : (widget.product.tag == 'Mới' ? const Color(0xFFD6734D) : AppColors.ink),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         child: Text(
-                          product.tag!.toUpperCase(),
+                          widget.product.tag!.toUpperCase(),
                           style: const TextStyle(
-                            color: AppColors.white,
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.6,
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
                     ),
 
-                  // Wishlist Button
+                  // Nút thả tim (Favorite)
                   Positioned(
                     top: 8,
                     right: 8,
                     child: Material(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: Colors.white.withValues(alpha: 0.95),
                       shape: const CircleBorder(),
-                      elevation: 1,
-                      shadowColor: Colors.black.withValues(alpha: 0.15),
                       child: InkWell(
                         customBorder: const CircleBorder(),
                         onTap: () {
                           HapticFeedback.lightImpact();
-                          productProvider.toggleFavorite(product.id);
+                          productProvider.toggleFavorite(widget.product.id);
                         },
                         child: Padding(
-                          padding: const EdgeInsets.all(5.5),
+                          padding: const EdgeInsets.all(7.0),
                           child: Icon(
                             isFav ? Icons.favorite : Icons.favorite_border,
-                            size: 15,
-                            color: isFav ? const Color(0xFFD32F2F) : AppColors.ink,
+                            size: 16,
+                            color: isFav ? const Color(0xFFD32F2F) : Colors.black87,
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  // Discount percentage pill on image bottom right
-                  if (product.discountPercentage > 0)
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.7),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '-${product.discountPercentage}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                  // Phần Control bên dưới ảnh (Thêm Nhanh HOẶC Chọn Size)
+                  Positioned(
+                    bottom: 12,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: _showSizeOverlay ? _buildSizeSelector() : _buildQuickAddButton(),
                     ),
+                  ),
                 ],
               ),
             ),
+          ),
+        ),
 
-            // Info Section
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    product.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
+        const SizedBox(height: 10),
 
-                  // Pricing
-                  Row(
-                    children: [
-                      Text(
-                        Formatters.formatCurrency(product.price),
-                        style: const TextStyle(
-                          color: AppColors.clay600,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (product.originalPrice != null &&
-                          product.originalPrice! > product.price) ...[
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            Formatters.formatCurrency(product.originalPrice!),
-                            style: TextStyle(
-                              color: AppColors.mute.withValues(alpha: 0.7),
-                              fontSize: 10,
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+        // 2. INFO SECTION (Chữ bên dưới ảnh)
+        Text(
+          'ÁO & ĐẦM', // Bạn có thể thay bằng widget.product.category nếu có
+          style: TextStyle(
+            color: AppColors.mute.withValues(alpha: 0.8),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 4),
 
-                  // Quick Add to Cart Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 28,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        side: BorderSide(
-                          color: AppColors.clay500.withValues(alpha: 0.7),
-                          width: 0.8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                        backgroundColor: AppColors.clay50.withValues(alpha: 0.5),
-                      ),
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        context.read<CartProvider>().addToCart(product, size: 'M');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Đã thêm "${product.name}" (Size M) vào giỏ'),
-                            duration: const Duration(seconds: 2),
-                            backgroundColor: AppColors.ink,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            action: SnackBarAction(
-                              label: 'XEM GIỎ',
-                              textColor: AppColors.sand300,
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const CartScreen()),
-                                );
-                              },
-                            ),
-                          ),
-                        );
-                      },
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_shopping_cart, size: 12, color: AppColors.clay600),
-                          SizedBox(width: 4),
-                          Text(
-                            'Thêm vào giỏ',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.clay600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+        Text(
+          widget.product.name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // Pricing
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              Formatters.formatCurrency(widget.product.price),
+              style: const TextStyle(
+                color: Color(0xFFA55142), // Màu đỏ nâu gạch giống thiết kế
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (widget.product.originalPrice != null &&
+                widget.product.originalPrice! > widget.product.price) ...[
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  Formatters.formatCurrency(widget.product.originalPrice!),
+                  style: TextStyle(
+                    color: AppColors.mute.withValues(alpha: 0.6),
+                    fontSize: 11,
+                    decoration: TextDecoration.lineThrough,
                   ),
-                ],
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Widget Nút "THÊM NHANH"
+  Widget _buildQuickAddButton() {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _toggleSizeOverlay();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.shopping_bag_outlined, size: 14, color: Colors.black87),
+            SizedBox(width: 6),
+            Text(
+              'THÊM NHANH',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+                letterSpacing: 0.5,
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // Widget Bảng chọn Size (S M L) và ĐÓNG SIZE
+  Widget _buildSizeSelector() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Khung chọn size
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF332B27), // Màu nâu đen giống thiết kế
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: ['S', 'M', 'L'].map((size) {
+              return GestureDetector(
+                onTap: () => _addToCart(size),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    size,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // Nút Đóng Size
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _toggleSizeOverlay();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.close, size: 12, color: Colors.black87),
+                SizedBox(width: 6),
+                Text(
+                  'ĐÓNG SIZE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
