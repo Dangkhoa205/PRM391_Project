@@ -441,6 +441,9 @@ class AuthProvider extends ChangeNotifier {
       if (result != null && result is Map<String, dynamic>) {
         _currentUser = UserModel.fromJson(result);
         await _saveUserToPrefs(_currentUser!);
+        // Lấy lại hồ sơ chuẩn từ BE để cập nhật cờ profileCompleted
+        // (PATCH có thể không trả cờ này ⇒ tránh nudge hiện nhầm sau khi đã hoàn thiện).
+        await fetchProfile();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -456,7 +459,7 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> changePassword({
+  Future<ChangePasswordOutcome> changePassword({
     required String oldPassword,
     required String newPassword,
     required String confirmPassword,
@@ -481,16 +484,22 @@ class AuthProvider extends ChangeNotifier {
       _accountInfo = null;
       _isLoading = false;
       notifyListeners();
-      return true;
+      return ChangePasswordOutcome.success;
     } on ApiException catch (e) {
+      _isLoading = false;
       _errorMessage = e.message;
+      notifyListeners();
+      // 409: tài khoản Google thuần chưa có mật khẩu ⇒ phải đi luồng "Tạo mật khẩu qua OTP".
+      if (e.statusCode == 409) return ChangePasswordOutcome.noPasswordYet;
+      // 429: vừa đổi mật khẩu gần đây ⇒ bắt chờ.
+      if (e.statusCode == 429) return ChangePasswordOutcome.rateLimited;
+      return ChangePasswordOutcome.error;
     } catch (e) {
+      _isLoading = false;
       _errorMessage = 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
+      notifyListeners();
+      return ChangePasswordOutcome.error;
     }
-
-    _isLoading = false;
-    notifyListeners();
-    return false;
   }
 
   Future<void> logout() async {

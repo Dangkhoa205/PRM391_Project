@@ -88,6 +88,14 @@ enum GoogleSignInOutcome {
   error,     // lỗi thật (sai cấu hình, mạng, BE từ chối...)
 }
 
+/// Kết quả đổi mật khẩu (PATCH /accounts/me/password) — để màn Đổi MK phản ứng theo doc BE.
+enum ChangePasswordOutcome {
+  success,       // đổi xong → BE thu hồi mọi phiên → về đăng nhập lại
+  noPasswordYet, // 409: tài khoản Google thuần chưa có mật khẩu → chuyển sang "Tạo mật khẩu qua OTP"
+  rateLimited,   // 429: vừa đổi mật khẩu gần đây → bắt chờ (5 phút)
+  error,         // lỗi khác (sai mật khẩu hiện tại, mật khẩu yếu...) → đọc errorMessage
+}
+
 /// Kết quả bước 3 (đặt lại mật khẩu bằng ticket).
 enum ResetPasswordOutcome {
   success,        // đổi xong → mọi phiên bị thu hồi → về Đăng nhập

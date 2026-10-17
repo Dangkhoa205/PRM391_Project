@@ -244,7 +244,10 @@ class ProfileScreen extends StatelessWidget {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => needsSetPassword
-                                      ? const ForgotPasswordScreen()
+                                      ? ForgotPasswordScreen(
+                                          prefillEmail: user.email,
+                                          setPasswordMode: true,
+                                        )
                                       : const ChangePasswordScreen(),
                                 ),
                               );

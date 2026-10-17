@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/auth_models.dart';
 import '../../providers/auth_provider.dart';
+import '../auth/forgot_password_screen.dart';
 import '../widgets/top_notification.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -35,8 +37,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     setState(() => _isSubmitting = true);
     final authProvider = context.read<AuthProvider>();
+    final email = authProvider.currentUser?.email ?? '';
 
-    final success = await authProvider.changePassword(
+    final outcome = await authProvider.changePassword(
       oldPassword: _oldPasswordController.text,
       newPassword: _newPasswordController.text,
       confirmPassword: _confirmPasswordController.text,
@@ -45,13 +48,36 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     setState(() => _isSubmitting = false);
     if (!mounted) return;
 
-    if (success) {
-      // BE đã thu hồi mọi phiên (provider đã xoá token/user) ⇒ về Home, đăng nhập lại.
-      TopNotification.show(context, 'Đổi mật khẩu thành công! Vui lòng đăng nhập lại.');
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } else {
-      final msg = authProvider.errorMessage ?? 'Đổi mật khẩu không thành công';
-      TopNotification.show(context, msg, success: false);
+    switch (outcome) {
+      case ChangePasswordOutcome.success:
+        // BE đã thu hồi mọi phiên (provider đã xoá token/user) ⇒ về Home, đăng nhập lại.
+        TopNotification.show(context, 'Đổi mật khẩu thành công! Vui lòng đăng nhập lại.');
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        break;
+      case ChangePasswordOutcome.noPasswordYet:
+        // 409: tài khoản Google thuần chưa có mật khẩu ⇒ chuyển sang luồng "Tạo mật khẩu qua OTP".
+        TopNotification.show(
+          context,
+          'Tài khoản này chưa có mật khẩu. Hãy tạo mật khẩu qua mã OTP.',
+          success: false,
+        );
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ForgotPasswordScreen(prefillEmail: email, setPasswordMode: true),
+          ),
+        );
+        break;
+      case ChangePasswordOutcome.rateLimited:
+        // 429: vừa đổi mật khẩu gần đây.
+        TopNotification.show(
+          context,
+          authProvider.errorMessage ?? 'Bạn vừa đổi mật khẩu gần đây. Vui lòng thử lại sau ít phút.',
+          success: false,
+        );
+        break;
+      case ChangePasswordOutcome.error:
+        TopNotification.show(context, authProvider.errorMessage ?? 'Đổi mật khẩu không thành công', success: false);
+        break;
     }
   }
 
@@ -119,7 +145,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Vui lòng nhập mật khẩu mới';
-                  if (v.length < 8) return 'Mật khẩu tối thiểu 8 ký tự';
+                  if (v.length < 8 || v.length > 100) return 'Mật khẩu từ 8 đến 100 ký tự';
                   if (!RegExp(r'[A-Z]').hasMatch(v) || !RegExp(r'[a-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v)) {
                     return 'Cần có chữ hoa, chữ thường và số';
                   }

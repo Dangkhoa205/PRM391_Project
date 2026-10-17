@@ -7,8 +7,18 @@ import '../widgets/top_notification.dart';
 import 'forgot_otp_screen.dart';
 
 /// Quên mật khẩu — bước 1: nhập email để nhận mã.
+///
+/// Khi [prefillEmail] có giá trị (vd tài khoản Google thuần bấm "Tạo mật khẩu"),
+/// email được điền sẵn và khoá lại — KHÔNG bắt người dùng nhập lại (theo doc BE mục 4B).
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+  final String? prefillEmail;
+  final bool setPasswordMode; // true = ngữ cảnh "Tạo mật khẩu" cho tài khoản Google
+
+  const ForgotPasswordScreen({
+    super.key,
+    this.prefillEmail,
+    this.setPasswordMode = false,
+  });
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -16,7 +26,15 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  late final TextEditingController _emailController;
+
+  bool get _emailLocked => (widget.prefillEmail ?? '').isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.prefillEmail ?? '');
+  }
 
   @override
   void dispose() {
@@ -47,7 +65,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.sand50,
-      appBar: AppBar(title: const Text('QUÊN MẬT KHẨU'), centerTitle: true),
+      appBar: AppBar(
+        title: Text(widget.setPasswordMode ? 'TẠO MẬT KHẨU' : 'QUÊN MẬT KHẨU'),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -57,23 +78,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Lấy lại mật khẩu',
+                  widget.setPasswordMode ? 'Tạo mật khẩu cho tài khoản' : 'Lấy lại mật khẩu',
                   style: GoogleFonts.playfairDisplay(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.ink),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Nhập email tài khoản. Nếu email đã đăng ký, chúng tôi sẽ gửi một mã xác minh 6 số tới đó.',
-                  style: TextStyle(fontSize: 13, color: AppColors.mute, height: 1.4),
+                Text(
+                  _emailLocked
+                      ? 'Mã xác minh 6 số sẽ được gửi tới email tài khoản của bạn bên dưới.'
+                      : 'Nhập email tài khoản. Nếu email đã đăng ký, chúng tôi sẽ gửi một mã xác minh 6 số tới đó.',
+                  style: const TextStyle(fontSize: 13, color: AppColors.mute, height: 1.4),
                 ),
                 const SizedBox(height: 24),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  readOnly: _emailLocked, // email tài khoản đã biết ⇒ không cho sửa
                   decoration: InputDecoration(
                     labelText: 'Địa chỉ Email *',
                     prefixIcon: const Icon(Icons.email_outlined),
+                    suffixIcon: _emailLocked ? const Icon(Icons.lock_outline, size: 18, color: AppColors.mute) : null,
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: _emailLocked ? AppColors.sand100 : Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.sand300)),
                   ),
                   validator: (v) {

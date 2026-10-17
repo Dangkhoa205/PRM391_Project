@@ -31,7 +31,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   String? _validatePassword(String? v) {
     if (v == null || v.isEmpty) return 'Vui lòng nhập mật khẩu';
-    if (v.length < 8) return 'Mật khẩu tối thiểu 8 ký tự';
+    if (v.length < 8 || v.length > 100) return 'Mật khẩu từ 8 đến 100 ký tự';
     if (!RegExp(r'[A-Z]').hasMatch(v) || !RegExp(r'[a-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v)) {
       return 'Cần có chữ hoa, chữ thường và số';
     }
