@@ -1,0 +1,4 @@
+{
+  "API_BASE_URL": "http://10.0.2.2:8088/api/v1",
+  "GOOGLE_CLIENT_ID": "PUT-YOUR-GOOGLE-WEB-CLIENT-ID-HERE.apps.googleusercontent.com"
+}

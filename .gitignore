@@ -4,3 +4,6 @@
 # IDE / local dev — không commit
 .idea/
 devtools_options.yaml
+
+# Config build FE (chứa client ID / URL theo môi trường) — không commit
+dart_define.json

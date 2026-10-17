@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../widgets/top_notification.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -45,23 +46,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (!mounted) return;
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đổi mật khẩu thành công!'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      Navigator.of(context).pop();
+      // BE đã thu hồi mọi phiên (provider đã xoá token/user) ⇒ về Home, đăng nhập lại.
+      TopNotification.show(context, 'Đổi mật khẩu thành công! Vui lòng đăng nhập lại.');
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
       final msg = authProvider.errorMessage ?? 'Đổi mật khẩu không thành công';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      TopNotification.show(context, msg, success: false);
     }
   }
 
@@ -86,7 +76,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Mật khẩu mới cần tối thiểu 6 ký tự để đảm bảo an toàn cho tài khoản của bạn.',
+                'Mật khẩu mới tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và số. '
+                'Đổi xong bạn sẽ bị đăng xuất khỏi mọi thiết bị và cần đăng nhập lại.',
                 style: TextStyle(fontSize: 13, color: AppColors.mute, height: 1.4),
               ),
               const SizedBox(height: 24),
@@ -116,7 +107,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 obscureText: _obscureNew,
                 decoration: InputDecoration(
                   labelText: 'Mật khẩu mới *',
-                  hintText: 'Tối thiểu 6 ký tự',
+                  hintText: '≥ 8 ký tự, có hoa + thường + số',
                   prefixIcon: const Icon(Icons.lock_reset),
                   filled: true,
                   fillColor: Colors.white,
@@ -128,7 +119,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Vui lòng nhập mật khẩu mới';
-                  if (v.length < 6) return 'Mật khẩu tối thiểu 6 ký tự';
+                  if (v.length < 8) return 'Mật khẩu tối thiểu 8 ký tự';
+                  if (!RegExp(r'[A-Z]').hasMatch(v) || !RegExp(r'[a-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v)) {
+                    return 'Cần có chữ hoa, chữ thường và số';
+                  }
                   return null;
                 },
               ),

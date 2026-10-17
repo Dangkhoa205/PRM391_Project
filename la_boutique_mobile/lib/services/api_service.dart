@@ -1,279 +1,181 @@
-import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/api_constants.dart';
+import '../core/network/api_exception.dart';
+import '../core/storage/token_store.dart';
 
-class ApiException implements Exception {
-  final int statusCode;
-  final String message;
-  final dynamic details;
-
-  ApiException({
-    required this.statusCode,
-    required this.message,
-    this.details,
-  });
-
-  @override
-  String toString() => message;
-}
-
+/// Lớp mạng trung tâm của app, dựng trên **Dio**.
+///
+/// Giữ nguyên interface cũ (`get/post/patch/delete`, `setTokens`, `clearTokens`...) để các
+/// provider khác (product, order, auth) không phải đổi. Điểm nâng cấp (GĐ 2):
+/// - Token lưu bằng **secure storage** (xem [TokenStore]).
+/// - Tự **refresh token khi 401** + **chống đua** (nhiều request 401 cùng lúc chỉ refresh 1 lần).
+/// - Refresh token **xoay vòng**: luôn lưu đè cả access lẫn refresh mới.
+/// - **Thu hồi phiên**: refresh thất bại ⇒ xoá token + gọi [onSessionExpired].
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
-  ApiService._internal();
+  ApiService._internal() {
+    _dio = Dio(BaseOptions(
+      baseUrl: ApiConstants.baseUrl,
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+      contentType: Headers.jsonContentType,
+      responseType: ResponseType.json,
+      // Tự xử mọi status code (kể cả 4xx/5xx) thay vì để Dio ném — ta parse envelope tay.
+      validateStatus: (_) => true,
+      headers: {
+        'Accept': 'application/json',
+        'X-Client-Type': 'mobile', // 🔴 toàn cục: BE trả token trong body cho mobile
+      },
+    ));
+  }
 
-  final http.Client _client = http.Client();
+  late final Dio _dio;
+  final TokenStore _store = TokenStore.instance;
 
-  static const String _keyAccessToken = 'app_access_token';
-  static const String _keyRefreshToken = 'app_refresh_token';
-
+  // Cache trong RAM để getter đọc đồng bộ; nguồn gốc vẫn là secure storage.
   String? _accessToken;
   String? _refreshToken;
+
+  /// Gọi khi phiên bị thu hồi / refresh thất bại (token đã bị xoá). UI tự cập nhật về trạng thái khách.
+  void Function()? onSessionExpired;
 
   String? get accessToken => _accessToken;
   String? get refreshToken => _refreshToken;
   bool get hasToken => _accessToken != null && _accessToken!.isNotEmpty;
 
   Future<void> init() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _accessToken = prefs.getString(_keyAccessToken);
-      _refreshToken = prefs.getString(_keyRefreshToken);
-    } catch (e) {
-      debugPrint('[ApiService] Failed to initialize tokens: $e');
-    }
+    _accessToken = await _store.accessToken;
+    _refreshToken = await _store.refreshToken;
   }
 
   Future<void> setTokens({required String accessToken, required String refreshToken}) async {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyAccessToken, accessToken);
-      await prefs.setString(_keyRefreshToken, refreshToken);
-    } catch (e) {
-      debugPrint('[ApiService] Failed to save tokens: $e');
-    }
+    await _store.save(accessToken: accessToken, refreshToken: refreshToken);
   }
 
   Future<void> clearTokens() async {
     _accessToken = null;
     _refreshToken = null;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_keyAccessToken);
-      await prefs.remove(_keyRefreshToken);
-    } catch (e) {
-      debugPrint('[ApiService] Failed to clear tokens: $e');
-    }
+    await _store.clear();
   }
 
-  Map<String, String> _buildHeaders({bool requiresAuth = true}) {
-    final headers = <String, String>{
-      'Content-Type': 'application/json; charset=UTF-8',
-      'Accept': 'application/json',
-      'X-Client-Type': 'mobile', // Instructs Spring Boot BE to return tokens in body
-    };
+  // --- Public API giữ nguyên chữ ký cũ ---
 
-    if (requiresAuth && _accessToken != null && _accessToken!.isNotEmpty) {
+  Future<dynamic> get(String path, {Map<String, dynamic>? queryParams, bool requiresAuth = true}) =>
+      _send('GET', path, queryParams: queryParams, requiresAuth: requiresAuth);
+
+  Future<dynamic> post(String path, {dynamic body, bool requiresAuth = true}) =>
+      _send('POST', path, body: body, requiresAuth: requiresAuth);
+
+  Future<dynamic> patch(String path, {dynamic body, bool requiresAuth = true}) =>
+      _send('PATCH', path, body: body, requiresAuth: requiresAuth);
+
+  Future<dynamic> delete(String path, {bool requiresAuth = true}) =>
+      _send('DELETE', path, requiresAuth: requiresAuth);
+
+  // --- Lõi ---
+
+  Future<Response<dynamic>> _rawCall(
+    String method,
+    String path, {
+    Map<String, dynamic>? queryParams,
+    dynamic body,
+    required bool requiresAuth,
+  }) {
+    final headers = <String, dynamic>{};
+    if (requiresAuth && (_accessToken?.isNotEmpty ?? false)) {
       headers['Authorization'] = 'Bearer $_accessToken';
     }
+    // Lọc query null để không gửi "key=" thừa.
+    final cleanQuery = queryParams == null
+        ? null
+        : (Map<String, dynamic>.from(queryParams)..removeWhere((_, v) => v == null));
 
-    return headers;
-  }
-
-  Uri _buildUri(String path, [Map<String, dynamic>? queryParameters]) {
-    final cleanPath = path.startsWith('/') ? path : '/$path';
-    final fullUrl = '${ApiConstants.baseUrl}$cleanPath';
-    final uri = Uri.parse(fullUrl);
-
-    if (queryParameters != null && queryParameters.isNotEmpty) {
-      final cleanParams = <String, String>{};
-      queryParameters.forEach((key, value) {
-        if (value != null) {
-          cleanParams[key] = value.toString();
-        }
-      });
-      return uri.replace(queryParameters: cleanParams);
-    }
-    return uri;
-  }
-
-  dynamic _processResponse(http.Response response) {
-    dynamic jsonBody;
-    try {
-      if (response.body.isNotEmpty) {
-        jsonBody = jsonDecode(utf8.decode(response.bodyBytes));
-      }
-    } catch (e) {
-      debugPrint('[ApiService] JSON decode error: $e');
-    }
-
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (jsonBody is Map<String, dynamic> && jsonBody.containsKey('result')) {
-        return jsonBody['result'];
-      }
-      return jsonBody;
-    }
-
-    String errorMessage = 'Yêu cầu không thành công (${response.statusCode})';
-    if (jsonBody is Map<String, dynamic>) {
-      if (jsonBody['message'] != null) {
-        errorMessage = jsonBody['message'].toString();
-      } else if (jsonBody['error'] != null) {
-        errorMessage = jsonBody['error'].toString();
-      }
-    }
-
-    throw ApiException(
-      statusCode: response.statusCode,
-      message: errorMessage,
-      details: jsonBody,
+    return _dio.request(
+      path,
+      data: body,
+      queryParameters: cleanQuery,
+      options: Options(method: method, headers: headers.isEmpty ? null : headers),
     );
   }
 
-  Future<dynamic> get(
+  Future<dynamic> _send(
+    String method,
     String path, {
     Map<String, dynamic>? queryParams,
-    bool requiresAuth = true,
-  }) async {
-    final uri = _buildUri(path, queryParams);
-    final headers = _buildHeaders(requiresAuth: requiresAuth);
-
-    try {
-      var response = await _client.get(uri, headers: headers);
-
-      // Handle token expiration: attempt 1 refresh
-      if (response.statusCode == 401 && requiresAuth && _refreshToken != null) {
-        final refreshed = await _attemptRefreshToken();
-        if (refreshed) {
-          final retryHeaders = _buildHeaders(requiresAuth: true);
-          response = await _client.get(uri, headers: retryHeaders);
-        }
-      }
-
-      return _processResponse(response);
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(
-        statusCode: 0,
-        message: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng hoặc khởi động BE.',
-      );
-    }
-  }
-
-  Future<dynamic> post(
-    String path, {
     dynamic body,
     bool requiresAuth = true,
   }) async {
-    final uri = _buildUri(path);
-    final headers = _buildHeaders(requiresAuth: requiresAuth);
-
     try {
-      var response = await _client.post(
-        uri,
-        headers: headers,
-        body: body != null ? jsonEncode(body) : null,
-      );
+      var resp = await _rawCall(method, path, queryParams: queryParams, body: body, requiresAuth: requiresAuth);
 
-      if (response.statusCode == 401 && requiresAuth && _refreshToken != null) {
+      // 401 ở endpoint cần auth (trừ chính luồng /auth/) ⇒ thử refresh 1 lần rồi gọi lại.
+      final isAuthFlow = path.startsWith('/auth/');
+      if (resp.statusCode == 401 && requiresAuth && !isAuthFlow && (_refreshToken?.isNotEmpty ?? false)) {
         final refreshed = await _attemptRefreshToken();
         if (refreshed) {
-          final retryHeaders = _buildHeaders(requiresAuth: true);
-          response = await _client.post(
-            uri,
-            headers: retryHeaders,
-            body: body != null ? jsonEncode(body) : null,
-          );
+          resp = await _rawCall(method, path, queryParams: queryParams, body: body, requiresAuth: requiresAuth);
         }
       }
 
-      return _processResponse(response);
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(
-        statusCode: 0,
-        message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại.',
-      );
+      return _processResponse(resp);
+    } on ApiException {
+      rethrow;
+    } on DioException catch (e) {
+      debugPrint('[ApiService] network error: ${e.message}');
+      throw ApiException(statusCode: 0, message: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng hoặc khởi động BE.');
     }
   }
 
-  Future<dynamic> patch(
-    String path, {
-    dynamic body,
-    bool requiresAuth = true,
-  }) async {
-    final uri = _buildUri(path);
-    final headers = _buildHeaders(requiresAuth: requiresAuth);
+  dynamic _processResponse(Response<dynamic> resp) {
+    final status = resp.statusCode ?? 0;
+    final body = resp.data;
 
-    try {
-      var response = await _client.patch(
-        uri,
-        headers: headers,
-        body: body != null ? jsonEncode(body) : null,
-      );
-
-      if (response.statusCode == 401 && requiresAuth && _refreshToken != null) {
-        final refreshed = await _attemptRefreshToken();
-        if (refreshed) {
-          final retryHeaders = _buildHeaders(requiresAuth: true);
-          response = await _client.patch(
-            uri,
-            headers: retryHeaders,
-            body: body != null ? jsonEncode(body) : null,
-          );
-        }
+    if (status >= 200 && status < 300) {
+      if (body is Map<String, dynamic> && body.containsKey('result')) {
+        return body['result'];
       }
-
-      return _processResponse(response);
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(
-        statusCode: 0,
-        message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại.',
-      );
+      return body;
     }
+
+    String message = 'Yêu cầu không thành công ($status)';
+    Map<String, String>? fieldErrors;
+    if (body is Map) {
+      if (body['message'] != null) {
+        message = body['message'].toString();
+      } else if (body['error'] != null) {
+        message = body['error'].toString();
+      }
+      if (body['errors'] is Map) {
+        fieldErrors = (body['errors'] as Map).map((k, v) => MapEntry(k.toString(), v.toString()));
+      }
+    }
+    throw ApiException(statusCode: status, message: message, fieldErrors: fieldErrors);
   }
 
-  Future<dynamic> delete(
-    String path, {
-    bool requiresAuth = true,
-  }) async {
-    final uri = _buildUri(path);
-    final headers = _buildHeaders(requiresAuth: requiresAuth);
+  // --- Refresh token: chống đua bằng một Future dùng chung ---
 
-    try {
-      final response = await _client.delete(uri, headers: headers);
-      return _processResponse(response);
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(
-        statusCode: 0,
-        message: 'Không thể kết nối đến máy chủ. Vui lòng thử lại.',
-      );
-    }
+  Future<bool>? _refreshing;
+
+  Future<bool> _attemptRefreshToken() {
+    // Mọi request 401 cùng lúc chờ CHUNG một lần refresh; xong thì reset để lần sau refresh lại được.
+    return _refreshing ??= _doRefresh().whenComplete(() => _refreshing = null);
   }
 
-  Future<bool> _attemptRefreshToken() async {
-    if (_refreshToken == null) return false;
+  Future<bool> _doRefresh() async {
+    if (_refreshToken == null || _refreshToken!.isEmpty) return false;
     try {
-      final uri = _buildUri(ApiConstants.refresh);
-      final response = await _client.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Client-Type': 'mobile',
-        },
-        body: jsonEncode({'refreshToken': _refreshToken}),
+      final resp = await _dio.post(
+        ApiConstants.refresh,
+        data: {'token': _refreshToken}, // 🔴 field 'token' theo hợp đồng BE
+        options: Options(headers: {'X-Client-Type': 'mobile'}),
       );
-
-      if (response.statusCode == 200) {
-        final body = jsonDecode(utf8.decode(response.bodyBytes));
-        final result = body['result'];
-        if (result != null && result['accessToken'] != null) {
+      if (resp.statusCode == 200 && resp.data is Map) {
+        final result = (resp.data as Map)['result'];
+        if (result is Map && result['accessToken'] != null) {
           await setTokens(
             accessToken: result['accessToken'] as String,
             refreshToken: (result['refreshToken'] as String?) ?? _refreshToken!,
@@ -282,10 +184,12 @@ class ApiService {
         }
       }
     } catch (e) {
-      debugPrint('[ApiService] Refresh token failed: $e');
+      debugPrint('[ApiService] refresh failed: $e');
     }
 
+    // Refresh hỏng = hết đường cứu: xoá token + báo UI về trạng thái khách.
     await clearTokens();
+    onSessionExpired?.call();
     return false;
   }
 }

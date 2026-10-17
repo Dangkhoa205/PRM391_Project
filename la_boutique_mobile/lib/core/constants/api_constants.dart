@@ -21,13 +21,23 @@ class ApiConstants {
     }
   }
 
-  static String baseUrl = defaultBaseUrl;
+  // Ưu tiên API_BASE_URL truyền qua --dart-define / dart_define.json (để đổi host khi chạy
+  // máy thật hoặc deploy mà KHÔNG sửa code). Không truyền thì dùng mặc định theo nền tảng ở trên
+  // (tiện cho dev trên emulator).
+  static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static String baseUrl = _envBaseUrl.isNotEmpty ? _envBaseUrl : defaultBaseUrl;
 
   // Auth endpoints
+  static const String register = '/auth/register';
+  static const String verifyRegistration = '/auth/verify-registration';
   static const String login = '/auth/login';
+  static const String google = '/auth/google';
   static const String refresh = '/auth/refresh';
   static const String logout = '/auth/logout';
   static const String logoutAll = '/auth/logout-all';
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String verifyOtp = '/auth/verify-otp';
+  static const String resetPassword = '/auth/reset-password';
 
   // Account endpoints
   static const String accounts = '/accounts';

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'dart:ui'; // Cần thiết cho ImageFilter (nếu muốn làm mờ ảnh)
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';

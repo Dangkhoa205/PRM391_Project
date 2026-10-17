@@ -23,4 +23,12 @@ class AppConfig {
     'SUPPORT_ZALO_URL',
     defaultValue: 'https://zalo.me/0901234567',
   );
+
+  /// Web client ID của Google — PHẢI trùng GOOGLE_CLIENT_ID của backend (dùng cho đăng nhập Google).
+  /// Lấy từ backend và truyền lúc build: --dart-define=GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+  /// Rỗng = chưa cấu hình (ẩn nút đăng nhập Google).
+  static const String googleServerClientId =
+      String.fromEnvironment('GOOGLE_CLIENT_ID');
+
+  static bool get isGoogleConfigured => googleServerClientId.isNotEmpty;
 }

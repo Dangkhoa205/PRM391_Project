@@ -43,6 +43,11 @@ dependencies:
   shared_preferences: ^2.5.6
   image_picker: ^1.2.4
   url_launcher: ^6.3.1
+  # Auth stack (GĐ 0): Dio cho interceptor + secure storage cho token
+  dio: ^5.7.0
+  flutter_secure_storage: ^9.2.2
+  # Đăng nhập Google (GĐ 5)
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:

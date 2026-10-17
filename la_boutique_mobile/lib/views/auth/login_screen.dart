@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/constants/app_config.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/auth_models.dart';
 import '../../providers/auth_provider.dart';
+import '../widgets/top_notification.dart';
+import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -37,13 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Xin chào trở lại, ${authProvider.currentUser?.name ?? "Nàng thơ"}! ✨'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
+      // Banner trên đầu, hiện đè lên trang vừa quay về (không bị pop che mất như SnackBar).
+      TopNotification.show(
+        context,
+        'Xin chào trở lại, ${authProvider.currentUser?.name ?? "Nàng thơ"}! ✨',
       );
       Navigator.of(context).pop(true);
     } else {
@@ -55,6 +56,24 @@ class _LoginScreenState extends State<LoginScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
+    }
+  }
+
+  void _handleGoogle() async {
+    final authProvider = context.read<AuthProvider>();
+    final outcome = await authProvider.signInWithGoogle();
+    if (!mounted) return;
+
+    switch (outcome) {
+      case GoogleSignInOutcome.success:
+        TopNotification.show(context, 'Đăng nhập Google thành công! ✨');
+        Navigator.of(context).pop(true);
+        break;
+      case GoogleSignInOutcome.cancelled:
+        break; // người dùng tự huỷ, không báo gì
+      case GoogleSignInOutcome.error:
+        TopNotification.show(context, authProvider.errorMessage ?? 'Đăng nhập Google thất bại', success: false);
+        break;
     }
   }
 
@@ -179,7 +198,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 4),
+
+                // Quên mật khẩu
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                    ),
+                    child: const Text(
+                      'Quên mật khẩu?',
+                      style: TextStyle(color: AppColors.clay600, fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
 
                 // Demo accounts hint
                 Container(
@@ -228,7 +267,38 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+
+                // Đăng nhập Google (ẩn nếu chưa cấu hình GOOGLE_CLIENT_ID)
+                if (AppConfig.isGoogleConfigured) ...[
+                  Row(
+                    children: const [
+                      Expanded(child: Divider(color: AppColors.sand300)),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 10),
+                        child: Text('hoặc', style: TextStyle(color: AppColors.mute, fontSize: 12)),
+                      ),
+                      Expanded(child: Divider(color: AppColors.sand300)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.sand300),
+                        foregroundColor: AppColors.ink,
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: isLoading ? null : _handleGoogle,
+                      icon: const Icon(Icons.g_mobiledata, size: 30, color: Color(0xFF4285F4)),
+                      label: const Text('Tiếp tục với Google', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
 
                 // Register Link (Dedicated Page Navigation)
                 Row(

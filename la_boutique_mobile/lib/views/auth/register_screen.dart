@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/auth_models.dart';
 import '../../providers/auth_provider.dart';
+import '../widgets/top_notification.dart';
 import 'login_screen.dart';
+import 'otp_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,11 +17,9 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _addressController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -26,48 +27,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _fullNameController.dispose();
     _emailController.dispose();
+    _fullNameController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _submitRegister() async {
+  String? _validateEmail(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Vui lòng nhập email';
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) return 'Email không hợp lệ';
+    return null;
+  }
+
+  String? _validatePassword(String? v) {
+    if (v == null || v.isEmpty) return 'Vui lòng nhập mật khẩu';
+    if (v.length < 8) return 'Mật khẩu tối thiểu 8 ký tự';
+    if (!RegExp(r'[A-Z]').hasMatch(v) || !RegExp(r'[a-z]').hasMatch(v) || !RegExp(r'\d').hasMatch(v)) {
+      return 'Cần có chữ hoa, chữ thường và số';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Vui lòng nhập số điện thoại';
+    if (!RegExp(r'^0\d{9}$').hasMatch(v.trim())) return 'SĐT phải 10 số, bắt đầu bằng 0';
+    return null;
+  }
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.register(
-      username: _usernameController.text.trim(),
+    final auth = context.read<AuthProvider>();
+    final form = RegisterForm(
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      fullName: _fullNameController.text.trim().isNotEmpty ? _fullNameController.text.trim() : null,
-      phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
-      address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
+      fullName: _fullNameController.text.trim(),
+      phone: _phoneController.text.trim(),
     );
 
+    final init = await auth.registerInit(form);
     if (!mounted) return;
 
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🎉 Đăng ký thành công! Chào mừng nàng đến với La Boutique VN.'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
+    if (init != null) {
+      // Sang màn nhập OTP (giữ màn này trong stack để nếu hồ sơ hết hạn thì quay lại được).
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => OtpScreen(init: init, form: form)),
       );
-      Navigator.of(context).pop(true);
     } else {
-      final msg = authProvider.errorMessage ?? 'Đăng ký không thành công. Vui lòng kiểm tra lại thông tin.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-        ),
+      TopNotification.show(
+        context,
+        auth.errorMessage ?? 'Đăng ký không thành công. Vui lòng thử lại.',
+        success: false,
       );
     }
   }
@@ -92,162 +104,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 Text(
                   'Gia Nhập Cùng La Boutique',
-                  style: GoogleFonts.playfairDisplay(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.ink,
-                  ),
+                  style: GoogleFonts.playfairDisplay(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.ink),
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Tạo tài khoản để lưu sản phẩm yêu thích, thanh toán nhanh chóng và theo dõi đơn hàng dễ dàng.',
+                  'Tạo tài khoản để lưu sản phẩm yêu thích, thanh toán nhanh và theo dõi đơn hàng. '
+                  'Chúng tôi sẽ gửi một mã xác minh tới email của nàng.',
                   style: TextStyle(fontSize: 13, color: AppColors.mute, height: 1.4),
                 ),
                 const SizedBox(height: 24),
 
-                // Username field
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: InputDecoration(
-                    labelText: 'Tên đăng nhập (Username) *',
-                    hintText: 'VD: nangtho2026',
-                    prefixIcon: const Icon(Icons.alternate_email),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.sand300),
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Vui lòng nhập tên đăng nhập';
-                    if (v.trim().length < 3) return 'Tối thiểu 3 ký tự';
-                    return null;
-                  },
+                _field(
+                  controller: _emailController,
+                  label: 'Địa chỉ Email *',
+                  hint: 'VD: customer@laboutique.vn',
+                  icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: _validateEmail,
                 ),
                 const SizedBox(height: 14),
-
-                // Full Name
-                TextFormField(
+                _field(
                   controller: _fullNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Họ và tên *',
-                    hintText: 'VD: Nguyễn Hoàng Lan',
-                    prefixIcon: const Icon(Icons.person_outline),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.sand300),
-                    ),
-                  ),
+                  label: 'Họ và tên *',
+                  hint: 'VD: Nguyễn Hoàng Lan',
+                  icon: Icons.person_outline,
                   validator: (v) => v == null || v.trim().isEmpty ? 'Vui lòng nhập họ tên' : null,
                 ),
                 const SizedBox(height: 14),
-
-                // Email
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Địa chỉ Email *',
-                    hintText: 'VD: customer@laboutique.vn',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.sand300),
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Vui lòng nhập email';
-                    if (!v.contains('@') || !v.contains('.')) return 'Email không hợp lệ';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
-                // Phone
-                TextFormField(
+                _field(
                   controller: _phoneController,
+                  label: 'Số điện thoại *',
+                  hint: 'VD: 0901234567',
+                  icon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: 'Số điện thoại *',
-                    hintText: 'VD: 0901234567',
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.sand300),
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Vui lòng nhập số điện thoại';
-                    if (v.trim().length < 9) return 'Số điện thoại không hợp lệ';
-                    return null;
-                  },
+                  validator: _validatePhone,
                 ),
                 const SizedBox(height: 14),
-
-                // Address
-                TextFormField(
-                  controller: _addressController,
-                  decoration: InputDecoration(
-                    labelText: 'Địa chỉ nhận hàng mặc định',
-                    hintText: 'VD: 72 Lê Thánh Tôn, Bến Nghé, Quận 1, TP.HCM',
-                    prefixIcon: const Icon(Icons.home_outlined),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.sand300),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Password
-                TextFormField(
+                _field(
                   controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Mật khẩu *',
-                    hintText: 'Tối thiểu 6 ký tự',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.sand300),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
+                  label: 'Mật khẩu *',
+                  hint: '≥ 8 ký tự, có hoa + thường + số',
+                  icon: Icons.lock_outline,
+                  obscure: _obscurePassword,
+                  suffix: IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
-                  validator: (v) => v == null || v.length < 6 ? 'Mật khẩu tối thiểu 6 ký tự' : null,
+                  validator: _validatePassword,
                 ),
                 const SizedBox(height: 14),
-
-                // Confirm Password
-                TextFormField(
+                _field(
                   controller: _confirmPasswordController,
-                  obscureText: _obscureConfirm,
-                  decoration: InputDecoration(
-                    labelText: 'Xác nhận lại mật khẩu *',
-                    prefixIcon: const Icon(Icons.lock_reset),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.sand300),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                    ),
+                  label: 'Xác nhận lại mật khẩu *',
+                  icon: Icons.lock_reset,
+                  obscure: _obscureConfirm,
+                  suffix: IconButton(
+                    icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Vui lòng xác nhận mật khẩu';
@@ -257,7 +170,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 28),
 
-                // Submit Button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -268,40 +180,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 2,
                     ),
-                    onPressed: isLoading ? null : _submitRegister,
+                    onPressed: isLoading ? null : _submit,
                     child: isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Text(
-                            'ĐĂNG KÝ TÀI KHOẢN',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.0),
-                          ),
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('GỬI MÃ XÁC MINH', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.0)),
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                // Dedicated Page Navigation back to Login
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text('Nàng đã có tài khoản? ', style: TextStyle(color: AppColors.mute, fontSize: 13)),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        );
-                      },
+                      onTap: () => Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      ),
                       child: const Text(
                         'Đăng nhập ngay',
-                        style: TextStyle(
-                          color: AppColors.clay600,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          decoration: TextDecoration.underline,
-                        ),
+                        style: TextStyle(color: AppColors.clay600, fontWeight: FontWeight.bold, fontSize: 13, decoration: TextDecoration.underline),
                       ),
                     ),
                   ],
@@ -312,6 +209,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _field({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    required IconData icon,
+    bool obscure = false,
+    Widget? suffix,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon),
+        suffixIcon: suffix,
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.sand300)),
+      ),
+      validator: validator,
     );
   }
 }
