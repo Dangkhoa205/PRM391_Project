@@ -81,6 +81,25 @@ class AccountInfo {
       );
 }
 
+/// Kết quả bước 1 đổi email (POST /accounts/me/email/request) — CHƯA đổi, chờ nhập OTP.
+class EmailChangeInit {
+  final String newEmail;
+  final int expiresIn;   // giây mã sống
+  final int resendAfter; // giây khoá nút gửi lại
+
+  EmailChangeInit({
+    required this.newEmail,
+    required this.expiresIn,
+    required this.resendAfter,
+  });
+
+  factory EmailChangeInit.fromJson(Map<String, dynamic> j) => EmailChangeInit(
+        newEmail: (j['newEmail'] ?? '').toString(),
+        expiresIn: (j['expiresIn'] as num?)?.toInt() ?? 600,
+        resendAfter: (j['resendAfter'] as num?)?.toInt() ?? 20,
+      );
+}
+
 /// Kết quả đăng nhập Google.
 enum GoogleSignInOutcome {
   success,   // có token → vào Home

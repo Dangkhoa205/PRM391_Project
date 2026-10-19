@@ -43,6 +43,8 @@ class ApiConstants {
   static const String accounts = '/accounts';
   static const String accountMe = '/accounts/me';
   static const String changePassword = '/accounts/me/password';
+  static const String emailChangeRequest = '/accounts/me/email/request';
+  static const String emailChangeConfirm = '/accounts/me/email/confirm';
 
   // Profile endpoints
   static const String profileMe = '/profiles/me';

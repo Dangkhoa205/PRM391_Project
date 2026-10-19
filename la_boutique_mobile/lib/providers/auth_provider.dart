@@ -382,31 +382,68 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Đổi email — cần xác minh mật khẩu hiện tại. Thành công ⇒ BE thu hồi mọi phiên ⇒
-  /// dọn token/user để buộc đăng nhập lại bằng email mới.
-  Future<bool> changeEmail({required String email, required String currentPassword}) async {
+  /// Đổi email — BƯỚC 1: xác minh mật khẩu hiện tại + gửi OTP tới ĐỊA CHỈ MỚI.
+  /// CHƯA đổi gì. Trả [EmailChangeInit] (có expiresIn/resendAfter) để dựng màn OTP; null nếu lỗi.
+  /// Dùng lại hàm này cho nút "Gửi lại mã" (truyền y nguyên newEmail + currentPassword).
+  Future<EmailChangeInit?> requestEmailChange({
+    required String newEmail,
+    required String currentPassword,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
     try {
-      await _api.patch(
-        ApiConstants.accountMe,
-        body: {'email': email.trim(), 'currentPassword': currentPassword},
+      final result = await _api.post(
+        ApiConstants.emailChangeRequest,
+        body: {'currentPassword': currentPassword, 'newEmail': newEmail.trim()},
       );
+      _isLoading = false;
+      notifyListeners();
+      if (result is Map<String, dynamic>) {
+        return EmailChangeInit.fromJson(result);
+      }
+      _errorMessage = 'Phản hồi không hợp lệ từ máy chủ.';
+      return null;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+    } catch (e) {
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+    }
+    _isLoading = false;
+    notifyListeners();
+    return null;
+  }
+
+  /// Đổi email — BƯỚC 2: nhập OTP tới địa chỉ mới. Thành công ⇒ BE thu hồi mọi phiên ⇒
+  /// dọn token/user, buộc đăng nhập lại bằng email mới. Tái dùng [RegVerifyOutcome].
+  Future<RegVerifyOutcome> confirmEmailChange({required String otp}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _api.post(ApiConstants.emailChangeConfirm, body: {'otp': otp.trim()});
       await _api.clearTokens();
       _currentUser = null;
       _accountInfo = null;
       _isLoading = false;
       notifyListeners();
-      return true;
+      return RegVerifyOutcome.success;
     } on ApiException catch (e) {
+      _isLoading = false;
       _errorMessage = e.message;
+      notifyListeners();
+      final m = e.message.toLowerCase();
+      if (e.statusCode == 429 || m.contains('too many')) return RegVerifyOutcome.rateLimited;
+      if (m.contains('no pending email change')) return RegVerifyOutcome.sessionExpired;
+      if (m.contains('expired')) return RegVerifyOutcome.codeExpired;
+      if (m.contains('incorrect')) return RegVerifyOutcome.wrongCode;
+      return RegVerifyOutcome.error;
     } catch (e) {
-      _errorMessage = 'Đổi email thất bại. Vui lòng thử lại.';
+      _isLoading = false;
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+      notifyListeners();
+      return RegVerifyOutcome.error;
     }
-    _isLoading = false;
-    notifyListeners();
-    return false;
   }
 
   Future<bool> updateProfile({

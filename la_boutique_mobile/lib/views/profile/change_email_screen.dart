@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../widgets/top_notification.dart';
+import 'change_email_otp_screen.dart';
 
-/// Đổi email đăng nhập — cần nhập lại mật khẩu hiện tại. Đổi xong bị đăng xuất mọi thiết bị.
+/// Đổi email — BƯỚC 1: nhập email mới + mật khẩu hiện tại. BE gửi OTP tới email mới,
+/// chưa đổi gì; sang màn OTP để xác nhận.
 class ChangeEmailScreen extends StatefulWidget {
   const ChangeEmailScreen({super.key});
 
@@ -28,17 +30,25 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
-    final ok = await auth.changeEmail(
-      email: _emailController.text.trim(),
-      currentPassword: _passwordController.text,
-    );
+    final newEmail = _emailController.text.trim();
+    final currentPassword = _passwordController.text;
+
+    final init = await auth.requestEmailChange(newEmail: newEmail, currentPassword: currentPassword);
     if (!mounted) return;
 
-    if (ok) {
-      TopNotification.show(context, 'Đổi email thành công! Vui lòng đăng nhập lại bằng email mới.');
-      Navigator.of(context).popUntil((route) => route.isFirst);
+    if (init != null) {
+      // Sang màn nhập OTP; mang theo newEmail + mật khẩu để còn "gửi lại mã".
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChangeEmailOtpScreen(
+            init: init,
+            newEmail: newEmail,
+            currentPassword: currentPassword,
+          ),
+        ),
+      );
     } else {
-      TopNotification.show(context, auth.errorMessage ?? 'Đổi email không thành công.', success: false);
+      TopNotification.show(context, auth.errorMessage ?? 'Không gửi được mã xác minh.', success: false);
     }
   }
 
@@ -62,7 +72,8 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Vì lý do bảo mật, bạn cần nhập lại mật khẩu hiện tại. Sau khi đổi, mọi thiết bị sẽ bị đăng xuất.',
+                'Nhập mật khẩu hiện tại + email mới. Chúng tôi sẽ gửi một mã xác minh 6 số tới '
+                'email MỚI — nhập đúng mã mới hoàn tất đổi. Đổi xong, mọi thiết bị sẽ bị đăng xuất.',
                 style: TextStyle(fontSize: 13, color: AppColors.mute, height: 1.4),
               ),
               const SizedBox(height: 24),
@@ -112,7 +123,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                   onPressed: isLoading ? null : _submit,
                   child: isLoading
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('XÁC NHẬN ĐỔI EMAIL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      : const Text('GỬI MÃ XÁC MINH', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 ),
               ),
             ],
