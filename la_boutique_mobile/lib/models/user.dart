@@ -10,6 +10,9 @@ class UserModel {
   final String? avatarUrl;
   final String address;
   final String? roleName;
+  /// Cờ BE trả ở /profiles/me: hồ sơ đã đủ thông tin (SĐT, địa chỉ...) chưa.
+  /// Dùng cho Nudge nhắc hoàn thiện hồ sơ (nhất là tài khoản Google thuần).
+  final bool profileCompleted;
 
   UserModel({
     required this.id,
@@ -23,6 +26,7 @@ class UserModel {
     this.avatarUrl,
     required this.address,
     this.roleName,
+    this.profileCompleted = false,
   });
 
   // Alias for backward compatibility with existing views
@@ -48,6 +52,7 @@ class UserModel {
       'avatarUrl': avatarUrl,
       'address': address,
       'roleName': roleName,
+      'profileCompleted': profileCompleted,
     };
   }
 
@@ -75,6 +80,7 @@ class UserModel {
       avatarUrl: json['avatarUrl'] as String?,
       address: (json['address'] as String?) ?? '',
       roleName: json['roleName'] as String?,
+      profileCompleted: json['profileCompleted'] as bool? ?? false,
     );
   }
 
@@ -90,6 +96,7 @@ class UserModel {
     String? avatarUrl,
     String? address,
     String? roleName,
+    bool? profileCompleted,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -103,6 +110,7 @@ class UserModel {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       address: address ?? this.address,
       roleName: roleName ?? this.roleName,
+      profileCompleted: profileCompleted ?? this.profileCompleted,
     );
   }
 }

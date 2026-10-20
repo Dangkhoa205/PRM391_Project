@@ -1,17 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/api_constants.dart';
+import '../core/constants/app_config.dart';
+import '../core/network/api_exception.dart';
+import '../models/auth_models.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
   UserModel? _currentUser;
+  AccountInfo? _accountInfo;
   bool _isLoading = false;
   String? _errorMessage;
 
   UserModel? get currentUser => _currentUser;
+  AccountInfo? get accountInfo => _accountInfo;
   bool get isAuthenticated => _currentUser != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -19,7 +25,17 @@ class AuthProvider extends ChangeNotifier {
   static const String _keyUserData = 'app_user_data';
 
   AuthProvider() {
+    // Khi phiên bị thu hồi (refresh thất bại / đổi mật khẩu ở nơi khác / admin khoá),
+    // ApiService đã xoá token — ở đây dọn luôn user để UI về trạng thái khách.
+    _api.onSessionExpired = _handleSessionExpired;
     _initSession();
+  }
+
+  void _handleSessionExpired() {
+    _currentUser = null;
+    _accountInfo = null;
+    SharedPreferences.getInstance().then((p) => p.remove(_keyUserData));
+    notifyListeners();
   }
 
   Future<void> _initSession() async {
@@ -88,56 +104,255 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> register({
-    required String username,
-    required String email,
-    required String password,
-    String? fullName,
-    String? phone,
-    String? address,
+  /// Bước 1 đăng ký: gửi hồ sơ → BE gửi OTP qua email, trả [RegistrationInit].
+  /// CHƯA tạo tài khoản, CHƯA có token. Trả null nếu lỗi (đọc [errorMessage]).
+  /// Dùng lại hàm này cho nút "Gửi lại mã" — nhớ ghi đè registrationId mới.
+  Future<RegistrationInit?> registerInit(RegisterForm form) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final result = await _api.post(
+        ApiConstants.register,
+        body: {
+          'email': form.email.trim(),
+          'password': form.password,
+          'fullName': form.fullName.trim(),
+          'phone': form.phone.trim(),
+        },
+        requiresAuth: false,
+      );
+
+      _isLoading = false;
+      notifyListeners();
+      if (result is Map<String, dynamic>) {
+        return RegistrationInit.fromJson(result);
+      }
+      _errorMessage = 'Phản hồi không hợp lệ từ máy chủ.';
+      return null;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+    } catch (e) {
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+      debugPrint('[AuthProvider] registerInit error: $e');
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return null;
+  }
+
+  /// Bước 2 đăng ký: xác minh OTP → nếu đúng, BE tạo tài khoản + trả token.
+  /// Trả [RegVerifyOutcome] để màn OTP biết nên làm gì (ở lại / gửi lại / về màn đăng ký).
+  Future<RegVerifyOutcome> verifyRegistration({
+    required String registrationId,
+    required String otp,
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // 1. Create account on BE
-      await _api.post(
-        ApiConstants.accounts,
-        body: {
-          'username': username.trim(),
-          'email': email.trim(),
-          'password': password,
-        },
+      final result = await _api.post(
+        ApiConstants.verifyRegistration,
+        body: {'registrationId': registrationId, 'otp': otp.trim()},
         requiresAuth: false,
       );
 
-      // 2. Automatically log in after registration (BE đăng nhập bằng email)
-      final loginSuccess = await login(email.trim(), password);
-
-      // 3. If extra profile info was provided, update profile
-      if (loginSuccess && (fullName != null || phone != null || address != null)) {
-        await updateProfile(
-          fullName: fullName ?? username,
-          phone: phone ?? '',
-          address: address ?? '',
+      if (result is Map<String, dynamic> && result['accessToken'] != null) {
+        await _api.setTokens(
+          accessToken: result['accessToken'] as String,
+          refreshToken: (result['refreshToken'] as String?) ?? '',
         );
+        await fetchProfile(); // BE đã lưu fullName/phone lúc đăng ký nên hồ sơ có sẵn
+        _isLoading = false;
+        notifyListeners();
+        return RegVerifyOutcome.success;
       }
 
+      _isLoading = false;
+      _errorMessage = 'Phản hồi không hợp lệ từ máy chủ.';
+      notifyListeners();
+      return RegVerifyOutcome.error;
+    } on ApiException catch (e) {
+      _isLoading = false;
+      _errorMessage = e.message;
+      notifyListeners();
+      final m = e.message.toLowerCase();
+      if (e.statusCode == 429 || m.contains('too many')) return RegVerifyOutcome.rateLimited;
+      if (m.contains('registration session has expired')) return RegVerifyOutcome.sessionExpired;
+      if (e.statusCode == 409) return RegVerifyOutcome.sessionExpired;
+      if (m.contains('verification code has expired')) return RegVerifyOutcome.codeExpired;
+      if (m.contains('incorrect verification code')) return RegVerifyOutcome.wrongCode;
+      return RegVerifyOutcome.error;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+      notifyListeners();
+      return RegVerifyOutcome.error;
+    }
+  }
+
+  /// Đăng nhập bằng Google: mở popup chọn tài khoản → lấy idToken → gửi BE (/auth/google).
+  /// Toàn bộ tương tác với Google gói trong provider để UI chỉ cần gọi 1 hàm.
+  Future<GoogleSignInOutcome> signInWithGoogle() async {
+    if (!AppConfig.isGoogleConfigured) {
+      _errorMessage = 'Ứng dụng chưa cấu hình Google (thiếu GOOGLE_CLIENT_ID).';
+      notifyListeners();
+      return GoogleSignInOutcome.error;
+    }
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final gsi = GoogleSignIn(
+        serverClientId: AppConfig.googleServerClientId, // Web client ID, để lấy idToken cho BE
+        scopes: const ['email', 'profile'],
+      );
+      await gsi.signOut(); // luôn hiện màn chọn tài khoản, tránh dính account cũ
+
+      final account = await gsi.signIn();
+      if (account == null) {
+        _isLoading = false;
+        notifyListeners();
+        return GoogleSignInOutcome.cancelled; // người dùng tự huỷ
+      }
+
+      final gAuth = await account.authentication;
+      final idToken = gAuth.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        _isLoading = false;
+        _errorMessage = 'Không lấy được idToken từ Google.';
+        notifyListeners();
+        return GoogleSignInOutcome.error;
+      }
+
+      final result = await _api.post(
+        ApiConstants.google,
+        body: {'idToken': idToken},
+        requiresAuth: false,
+      );
+
+      if (result is Map<String, dynamic> && result['accessToken'] != null) {
+        await _api.setTokens(
+          accessToken: result['accessToken'] as String,
+          refreshToken: (result['refreshToken'] as String?) ?? '',
+        );
+        await fetchProfile();
+        _isLoading = false;
+        notifyListeners();
+        return GoogleSignInOutcome.success;
+      }
+
+      _isLoading = false;
+      _errorMessage = 'Phản hồi không hợp lệ từ máy chủ.';
+      notifyListeners();
+      return GoogleSignInOutcome.error;
+    } on ApiException catch (e) {
+      _isLoading = false;
+      _errorMessage = e.message;
+      notifyListeners();
+      return GoogleSignInOutcome.error;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Đăng nhập Google thất bại. Vui lòng thử lại.';
+      debugPrint('[AuthProvider] googleSignIn error: $e');
+      notifyListeners();
+      return GoogleSignInOutcome.error;
+    }
+  }
+
+  /// Quên mật khẩu — bước 1. BE LUÔN trả 200 (không lộ email có tồn tại hay không).
+  /// Trả true nghĩa là "đã nhận yêu cầu" → cứ sang màn nhập OTP.
+  Future<bool> forgotPassword(String email) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _api.post(ApiConstants.forgotPassword, body: {'email': email.trim()}, requiresAuth: false);
       _isLoading = false;
       notifyListeners();
       return true;
     } on ApiException catch (e) {
       _errorMessage = e.message;
-      debugPrint('[AuthProvider] Registration failed: ${e.message}');
     } catch (e) {
-      _errorMessage = 'Lỗi tạo tài khoản. Vui lòng thử lại.';
-      debugPrint('[AuthProvider] Registration error: $e');
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
     }
-
     _isLoading = false;
     notifyListeners();
     return false;
+  }
+
+  /// Quên mật khẩu — bước 2. Đổi OTP lấy "vé" (ticket) sống 5 phút.
+  Future<ResetOtpResult> verifyResetOtp({required String email, required String otp}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final result = await _api.post(
+        ApiConstants.verifyOtp,
+        body: {'email': email.trim(), 'otp': otp.trim()},
+        requiresAuth: false,
+      );
+      _isLoading = false;
+      notifyListeners();
+      if (result is Map<String, dynamic> && result['ticket'] != null) {
+        return ResetOtpResult(RegVerifyOutcome.success, result['ticket'] as String);
+      }
+      _errorMessage = 'Phản hồi không hợp lệ từ máy chủ.';
+      return ResetOtpResult(RegVerifyOutcome.error, null);
+    } on ApiException catch (e) {
+      _isLoading = false;
+      _errorMessage = e.message;
+      notifyListeners();
+      final m = e.message.toLowerCase();
+      if (e.statusCode == 429 || m.contains('too many')) return ResetOtpResult(RegVerifyOutcome.rateLimited, null);
+      if (m.contains('expired')) return ResetOtpResult(RegVerifyOutcome.codeExpired, null);
+      if (m.contains('incorrect')) return ResetOtpResult(RegVerifyOutcome.wrongCode, null);
+      return ResetOtpResult(RegVerifyOutcome.error, null);
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+      notifyListeners();
+      return ResetOtpResult(RegVerifyOutcome.error, null);
+    }
+  }
+
+  /// Quên mật khẩu — bước 3. Đặt mật khẩu mới bằng vé. Thành công ⇒ BE thu hồi mọi phiên.
+  Future<ResetPasswordOutcome> resetPassword({required String ticket, required String newPassword}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _api.post(
+        ApiConstants.resetPassword,
+        body: {'ticket': ticket, 'newPassword': newPassword},
+        requiresAuth: false,
+      );
+      // Mọi phiên bị thu hồi — dọn luôn token/user nếu đang có.
+      await _api.clearTokens();
+      _currentUser = null;
+      _accountInfo = null;
+      _isLoading = false;
+      notifyListeners();
+      return ResetPasswordOutcome.success;
+    } on ApiException catch (e) {
+      _isLoading = false;
+      _errorMessage = e.message;
+      notifyListeners();
+      if (e.statusCode == 401) return ResetPasswordOutcome.ticketExpired;
+      if (e.statusCode == 403) return ResetPasswordOutcome.forbidden;
+      if (e.statusCode == 400) return ResetPasswordOutcome.weakPassword;
+      return ResetPasswordOutcome.error;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+      notifyListeners();
+      return ResetPasswordOutcome.error;
+    }
   }
 
   Future<void> fetchProfile() async {
@@ -150,6 +365,84 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[AuthProvider] fetchProfile error: $e');
+    }
+    // Thông tin tài khoản (provider, hasPassword) cho màn Bảo mật.
+    await _fetchAccountInfo();
+  }
+
+  Future<void> _fetchAccountInfo() async {
+    try {
+      final r = await _api.get(ApiConstants.accountMe, requiresAuth: true);
+      if (r is Map<String, dynamic>) {
+        _accountInfo = AccountInfo.fromJson(r);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[AuthProvider] fetchAccountMe error: $e');
+    }
+  }
+
+  /// Đổi email — BƯỚC 1: xác minh mật khẩu hiện tại + gửi OTP tới ĐỊA CHỈ MỚI.
+  /// CHƯA đổi gì. Trả [EmailChangeInit] (có expiresIn/resendAfter) để dựng màn OTP; null nếu lỗi.
+  /// Dùng lại hàm này cho nút "Gửi lại mã" (truyền y nguyên newEmail + currentPassword).
+  Future<EmailChangeInit?> requestEmailChange({
+    required String newEmail,
+    required String currentPassword,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final result = await _api.post(
+        ApiConstants.emailChangeRequest,
+        body: {'currentPassword': currentPassword, 'newEmail': newEmail.trim()},
+      );
+      _isLoading = false;
+      notifyListeners();
+      if (result is Map<String, dynamic>) {
+        return EmailChangeInit.fromJson(result);
+      }
+      _errorMessage = 'Phản hồi không hợp lệ từ máy chủ.';
+      return null;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+    } catch (e) {
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+    }
+    _isLoading = false;
+    notifyListeners();
+    return null;
+  }
+
+  /// Đổi email — BƯỚC 2: nhập OTP tới địa chỉ mới. Thành công ⇒ BE thu hồi mọi phiên ⇒
+  /// dọn token/user, buộc đăng nhập lại bằng email mới. Tái dùng [RegVerifyOutcome].
+  Future<RegVerifyOutcome> confirmEmailChange({required String otp}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _api.post(ApiConstants.emailChangeConfirm, body: {'otp': otp.trim()});
+      await _api.clearTokens();
+      _currentUser = null;
+      _accountInfo = null;
+      _isLoading = false;
+      notifyListeners();
+      return RegVerifyOutcome.success;
+    } on ApiException catch (e) {
+      _isLoading = false;
+      _errorMessage = e.message;
+      notifyListeners();
+      final m = e.message.toLowerCase();
+      if (e.statusCode == 429 || m.contains('too many')) return RegVerifyOutcome.rateLimited;
+      if (m.contains('no pending email change')) return RegVerifyOutcome.sessionExpired;
+      if (m.contains('expired')) return RegVerifyOutcome.codeExpired;
+      if (m.contains('incorrect')) return RegVerifyOutcome.wrongCode;
+      return RegVerifyOutcome.error;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Lỗi kết nối máy chủ. Vui lòng thử lại.';
+      notifyListeners();
+      return RegVerifyOutcome.error;
     }
   }
 
@@ -185,6 +478,9 @@ class AuthProvider extends ChangeNotifier {
       if (result != null && result is Map<String, dynamic>) {
         _currentUser = UserModel.fromJson(result);
         await _saveUserToPrefs(_currentUser!);
+        // Lấy lại hồ sơ chuẩn từ BE để cập nhật cờ profileCompleted
+        // (PATCH có thể không trả cờ này ⇒ tránh nudge hiện nhầm sau khi đã hoàn thiện).
+        await fetchProfile();
         _isLoading = false;
         notifyListeners();
         return true;
@@ -200,7 +496,7 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> changePassword({
+  Future<ChangePasswordOutcome> changePassword({
     required String oldPassword,
     required String newPassword,
     required String confirmPassword,
@@ -213,30 +509,41 @@ class AuthProvider extends ChangeNotifier {
       await _api.patch(
         ApiConstants.changePassword,
         body: {
-          'oldPassword': oldPassword,
+          // Backend đổi mật khẩu xác minh bằng mật khẩu hiện tại (field 'currentPassword').
+          // 'confirmPassword' chỉ kiểm khớp ở client, KHÔNG gửi lên BE.
+          'currentPassword': oldPassword,
           'newPassword': newPassword,
-          'confirmPassword': confirmPassword,
         },
       );
+      // Đổi mật khẩu thành công ⇒ BE thu hồi MỌI phiên ⇒ dọn token/user, buộc đăng nhập lại.
+      await _api.clearTokens();
+      _currentUser = null;
+      _accountInfo = null;
       _isLoading = false;
       notifyListeners();
-      return true;
+      return ChangePasswordOutcome.success;
     } on ApiException catch (e) {
+      _isLoading = false;
       _errorMessage = e.message;
+      notifyListeners();
+      // 409: tài khoản Google thuần chưa có mật khẩu ⇒ phải đi luồng "Tạo mật khẩu qua OTP".
+      if (e.statusCode == 409) return ChangePasswordOutcome.noPasswordYet;
+      // 429: vừa đổi mật khẩu gần đây ⇒ bắt chờ.
+      if (e.statusCode == 429) return ChangePasswordOutcome.rateLimited;
+      return ChangePasswordOutcome.error;
     } catch (e) {
+      _isLoading = false;
       _errorMessage = 'Đổi mật khẩu thất bại. Vui lòng thử lại.';
+      notifyListeners();
+      return ChangePasswordOutcome.error;
     }
-
-    _isLoading = false;
-    notifyListeners();
-    return false;
   }
 
   Future<void> logout() async {
     try {
       await _api.post(
         ApiConstants.logout,
-        body: {'refreshToken': _api.refreshToken},
+        body: {'token': _api.refreshToken},
       );
     } catch (e) {
       debugPrint('[AuthProvider] Logout BE error (ignored): $e');
@@ -244,6 +551,7 @@ class AuthProvider extends ChangeNotifier {
 
     await _api.clearTokens();
     _currentUser = null;
+    _accountInfo = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyUserData);
     notifyListeners();
@@ -253,7 +561,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _api.post(
         ApiConstants.logoutAll,
-        body: {'refreshToken': _api.refreshToken},
+        body: {'token': _api.refreshToken},
       );
     } catch (e) {
       debugPrint('[AuthProvider] LogoutAll BE error (ignored): $e');
@@ -261,6 +569,7 @@ class AuthProvider extends ChangeNotifier {
 
     await _api.clearTokens();
     _currentUser = null;
+    _accountInfo = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyUserData);
     notifyListeners();

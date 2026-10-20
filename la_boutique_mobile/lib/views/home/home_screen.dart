@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/product_provider.dart';
@@ -11,6 +12,7 @@ import '../chat/chat_screen.dart';
 import '../map/store_map_screen.dart';
 import '../notification/notification_screen.dart';
 import '../product/product_list_screen.dart';
+import '../profile/edit_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../widgets/product_card.dart';
 
@@ -140,6 +142,7 @@ class _HomeTabState extends State<_HomeTab> {
   final PageController _heroController = PageController();
   int _currentHeroSlide = 0;
   Timer? _heroTimer;
+  bool _nudgeDismissed = false; // tắt banner nhắc hoàn thiện hồ sơ trong phiên này
 
   final List<String> _heroSlides = [
     'assets/images/products/sunset-main-1.jpg',
@@ -176,6 +179,10 @@ class _HomeTabState extends State<_HomeTab> {
     final productProvider = context.watch<ProductProvider>();
     final sunsetList = productProvider.sunsetCollection;
     final allProducts = productProvider.allProducts;
+
+    // Nudge: đã đăng nhập nhưng hồ sơ chưa hoàn thiện (SĐT/địa chỉ...) → nhắc, không chặn.
+    final user = context.watch<AuthProvider>().currentUser;
+    final showProfileNudge = user != null && !user.profileCompleted && !_nudgeDismissed;
 
     return Scaffold(
       backgroundColor: AppColors.sand50,
@@ -249,6 +256,18 @@ class _HomeTabState extends State<_HomeTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 0. Nudge nhắc hoàn thiện hồ sơ (chỉ hiện khi profileCompleted == false)
+            if (showProfileNudge)
+              _ProfileNudgeCard(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                  );
+                },
+                onDismiss: () => setState(() => _nudgeDismissed = true),
+              ),
+
             // 1. Hero Auto Carousel (Editorial Luxury Style)
             SizedBox(
               height: 340,
@@ -674,6 +693,73 @@ class _HomeTabState extends State<_HomeTab> {
 
             const SizedBox(height: 20),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileNudgeCard extends StatelessWidget {
+  final VoidCallback onTap;
+  final VoidCallback onDismiss;
+
+  const _ProfileNudgeCard({required this.onTap, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      decoration: BoxDecoration(
+        color: AppColors.clay50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.clay100, width: 0.8),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.clay100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.badge_outlined, color: AppColors.clay600, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hồ sơ chưa hoàn thiện',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.ink),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Bổ sung SĐT & địa chỉ để đặt hàng nhanh hơn ✨',
+                        style: TextStyle(fontSize: 10.5, color: AppColors.mute),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.clay500, size: 20),
+                InkWell(
+                  onTap: onDismiss,
+                  borderRadius: BorderRadius.circular(20),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.close_rounded, size: 16, color: AppColors.mute),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../auth/forgot_password_screen.dart';
 import '../auth/login_screen.dart';
 import '../auth/register_screen.dart';
 import '../chat/chat_screen.dart';
 import '../map/store_map_screen.dart';
 import '../order/my_orders_screen.dart';
 import '../order/order_lookup_screen.dart';
+import 'change_email_screen.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 
@@ -19,6 +21,8 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
+    // Tài khoản Google thuần chưa có mật khẩu ⇒ hiện "Đặt mật khẩu" (dẫn luồng quên mật khẩu).
+    final needsSetPassword = auth.accountInfo != null && !auth.accountInfo!.hasPassword;
 
     return Scaffold(
       backgroundColor: AppColors.sand50,
@@ -231,13 +235,42 @@ class ProfileScreen extends StatelessWidget {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
                             icon: const Icon(Icons.lock_outline, size: 15, color: AppColors.clay600),
-                            label: const Text('Đổi mật khẩu', style: TextStyle(fontSize: 12, color: AppColors.ink)),
+                            label: Text(
+                              needsSetPassword ? 'Đặt mật khẩu' : 'Đổi mật khẩu',
+                              style: const TextStyle(fontSize: 12, color: AppColors.ink),
+                            ),
                             onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => needsSetPassword
+                                      ? ForgotPasswordScreen(
+                                          prefillEmail: user.email,
+                                          setPasswordMode: true,
+                                        )
+                                      : const ChangePasswordScreen(),
+                                ),
+                              );
                             },
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          side: const BorderSide(color: AppColors.sand300),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.alternate_email, size: 15, color: AppColors.clay600),
+                        label: const Text('Đổi email đăng nhập', style: TextStyle(fontSize: 12, color: AppColors.ink)),
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangeEmailScreen()));
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -417,7 +450,13 @@ class ProfileScreen extends StatelessWidget {
       ),
       title: Row(
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.ink)),
+          Flexible(
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.ink),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           if (badge != null) ...[
             const SizedBox(width: 8),
             Container(
