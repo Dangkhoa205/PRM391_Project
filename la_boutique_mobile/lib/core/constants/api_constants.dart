@@ -49,6 +49,24 @@ class ApiConstants {
   // Profile endpoints
   static const String profileMe = '/profiles/me';
 
+  // Notification endpoints (đều cần đăng nhập)
+  static const String notifications = '/notifications/me';
+  static const String notificationsUnreadCount = '/notifications/me/unread-count';
+  static const String notificationsReadAll = '/notifications/me/read-all';
+  static String notificationRead(String id) => '/notifications/me/$id/read';
+  static String notificationById(String id) => '/notifications/me/$id';
+
+  // Conversation / chat endpoints (đều cần đăng nhập)
+  static const String conversationMe = '/conversations/me';
+  static const String conversationMessages = '/conversations/me/messages';
+  static const String conversationMessagesNew = '/conversations/me/messages/new';
+  static const String conversationSend = '/conversations/me/messages';
+  static const String conversationRead = '/conversations/me/read';
+
+  // Store endpoints (công khai, không cần đăng nhập)
+  static const String stores = '/stores';
+  static String storeById(String id) => '/stores/id/$id';
+
   // Category endpoints
   static const String categories = '/categories';
 
