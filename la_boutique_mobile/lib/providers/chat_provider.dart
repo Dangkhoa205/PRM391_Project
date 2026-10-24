@@ -1,65 +1,135 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../core/constants/api_constants.dart';
 import '../models/chat_message.dart';
+import '../services/api_service.dart';
 
+/// Chat khách ↔ shop — nối BE thật bằng POLLING (không WebSocket, theo thiết kế BE).
+/// Mở màn → tải lịch sử + hỏi tin mới mỗi 3 giây; đóng màn → dừng hỏi.
 class ChatProvider extends ChangeNotifier {
+  final ApiService _api = ApiService();
+
   final List<ChatMessage> _messages = [];
+  bool _isLoading = false;
+  Timer? _poll;
+  DateTime? _sinceUtc; // mốc instant của tin cuối, để hỏi "tin mới hơn mốc này"
 
-  List<ChatMessage> get messages => [..._messages];
+  List<ChatMessage> get messages => List.unmodifiable(_messages);
+  bool get isLoading => _isLoading;
 
-  ChatProvider() {
-    _initWelcomeMessages();
+  /// Tải lịch sử (BE trả mới→cũ, đảo lại cũ→mới để hiển thị) + đánh dấu đã đọc.
+  Future<void> loadHistory() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final result = await _api.get(
+        ApiConstants.conversationMessages,
+        queryParams: {'size': 50},
+        requiresAuth: true,
+      );
+      if (result is Map<String, dynamic> && result['content'] is List) {
+        final list = (result['content'] as List)
+            .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+            .toList()
+            .reversed
+            .toList();
+        _messages
+          ..clear()
+          ..addAll(list);
+        _updateSince();
+      }
+      await markRead();
+    } catch (e) {
+      debugPrint('[ChatProvider] loadHistory error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  void _initWelcomeMessages() {
-    _messages.addAll([
-      ChatMessage(
-        id: 'msg_0',
-        text: 'Dạ La Boutique xin kính chào Quý khách! 🌸 Em có thể tư vấn mẫu váy áo hoặc hướng dẫn chọn size giúp nàng không ạ?',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-        isFromUser: false,
-      ),
-    ]);
+  void _updateSince() {
+    if (_messages.isNotEmpty) _sinceUtc = _messages.last.timestamp.toUtc();
   }
 
   Future<void> sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
+    final content = text.trim();
+    if (content.isEmpty) return;
+    try {
+      final result = await _api.post(
+        ApiConstants.conversationSend,
+        body: {'content': content},
+        requiresAuth: true,
+      );
+      if (result is Map<String, dynamic>) {
+        final msg = ChatMessage.fromJson(result);
+        if (!_messages.any((m) => m.id == msg.id)) {
+          _messages.add(msg);
+          _updateSince();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('[ChatProvider] send error: $e');
+    }
+  }
 
-    final userMsg = ChatMessage(
-      id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
-      text: text.trim(),
-      timestamp: DateTime.now(),
-      isFromUser: true,
-    );
+  void startPolling() {
+    _poll?.cancel();
+    _poll = Timer.periodic(const Duration(seconds: 3), (_) => _pollNew());
+  }
 
-    _messages.add(userMsg);
-    notifyListeners();
+  void stopPolling() {
+    _poll?.cancel();
+    _poll = null;
+  }
 
-    // Simulate smart shop assistant reply
-    await Future.delayed(const Duration(milliseconds: 1000));
-    final reply = _generateReply(text.toLowerCase());
+  Future<void> _pollNew() async {
+    try {
+      final qp = <String, dynamic>{};
+      if (_sinceUtc != null) qp['since'] = _sinceUtc!.toIso8601String();
+      final result = await _api.get(
+        ApiConstants.conversationMessagesNew,
+        queryParams: qp.isEmpty ? null : qp,
+        requiresAuth: true,
+      );
+      if (result is List && result.isNotEmpty) {
+        var changed = false;
+        for (final e in result) {
+          final msg = ChatMessage.fromJson(e as Map<String, dynamic>);
+          if (!_messages.any((m) => m.id == msg.id)) {
+            _messages.add(msg);
+            changed = true;
+          }
+        }
+        if (changed) {
+          _updateSince();
+          await markRead();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('[ChatProvider] poll error: $e');
+    }
+  }
 
-    final botMsg = ChatMessage(
-      id: 'msg_bot_${DateTime.now().millisecondsSinceEpoch}',
-      text: reply,
-      timestamp: DateTime.now(),
-      isFromUser: false,
-    );
+  Future<void> markRead() async {
+    try {
+      await _api.patch(ApiConstants.conversationRead, requiresAuth: true);
+    } catch (_) {
+      // không quan trọng nếu lỗi
+    }
+  }
 
-    _messages.add(botMsg);
+  void clear() {
+    _messages.clear();
+    _sinceUtc = null;
+    stopPolling();
     notifyListeners();
   }
 
-  String _generateReply(String input) {
-    if (input.contains('size') || input.contains('kích thước') || input.contains('kg')) {
-      return 'Dạ bảng size chuẩn tại La Boutique:\n• Size S: Dưới 48kg (Vòng 1 < 84cm, Vòng 2 < 66cm)\n• Size M: 48 - 54kg (Vòng 1: 85-88cm, Vòng 2: 67-72cm)\n• Size L: 55 - 62kg (Vòng 1: 89-94cm, Vòng 2: 73-78cm)\nNàng cho em xin chiều cao và cân nặng để em chọn size chuẩn nhất cho nàng nhé!';
-    } else if (input.contains('ship') || input.contains('giao') || input.contains('vận chuyển')) {
-      return 'Dạ La Boutique hỗ trợ FREESHIP toàn quốc cho đơn hàng từ 1.000.000₫ hoặc khi nhập mã FREESHIP. Thời gian giao từ 1-2 ngày với nội thành và 2-3 ngày với các tỉnh thành khác ạ! ✨';
-    } else if (input.contains('sunset') || input.contains('bộ sưu tập') || input.contains('mới')) {
-      return 'Bộ sưu tập La Boutique Sunset SS26 mang phong cách lãng mạn hoàng hôn biển, kết hợp chất liệu lụa satin mượt và linen hữu cơ thoáng mát cực kỳ sang trọng ạ! 🌅';
-    } else if (input.contains('đổi') || input.contains('trả') || input.contains('bảo hành')) {
-      return 'Dạ La Boutique hỗ trợ đổi size trong vòng 7 ngày kể từ khi nhận hàng (sản phẩm còn nguyên tem mác). Nàng yên tâm mua sắm nhé ạ!';
-    } else {
-      return 'Dạ La Boutique đã nhận được thông tin từ nàng. Chuyên viên tư vấn đang kiểm tra kho và sẽ hỗ trợ nàng ngay trong giây lát nhé! 💕';
-    }
+  @override
+  void dispose() {
+    stopPolling();
+    super.dispose();
   }
 }

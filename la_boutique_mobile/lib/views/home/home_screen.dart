@@ -26,6 +26,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // Lấy số thông báo chưa đọc cho chấm đỏ (nếu đã đăng nhập; chưa thì trả 0 im lặng).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().fetchUnreadCount();
+    });
+  }
+
   void _onExplorePressed() {
     setState(() => _currentIndex = 1); // Switch to Product Catalog tab
   }
